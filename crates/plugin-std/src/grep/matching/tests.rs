@@ -76,6 +76,25 @@ fn the_stream_stops_when_the_callback_says_so() {
 }
 
 #[test]
+fn a_multiline_stream_stops_in_the_middle_of_a_match_when_the_callback_says_so() {
+    let regex = RegexBuilder::new("b\nc\nd")
+        .build()
+        .expect("the pattern compiles");
+    let text = "a\nb\nc\nd\nb\nc\nd\n";
+    let lines = split_lines(text);
+    let mut seen = Vec::new();
+    each_match_line(&regex, true, text, &lines, |line, _| {
+        seen.push(line);
+        seen.len() < 2
+    });
+    assert_eq!(
+        seen,
+        [1, 2],
+        "the third line of the first match is not sent"
+    );
+}
+
+#[test]
 fn line_starts_agree_with_split_lines_for_every_shape_of_ending() {
     for text in ["", "a", "a\n", "a\n\n", "\n", "a\r\nb\r\n", "a\n\nb"] {
         assert_eq!(line_starts(text).len(), split_lines(text).len(), "{text:?}");

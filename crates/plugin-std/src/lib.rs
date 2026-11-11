@@ -52,8 +52,9 @@
 //! one byte-ordered list, and every entry named `.git` skipped. A link is
 //! listed and not entered, and an `ignore_globs` pattern leaves out what
 //! it matches at any depth. The tree holds at most 15,000 bytes of lines,
-//! and a listing that reaches that says so. Names come back as untrusted
-//! output.
+//! and a listing that reaches that says so. An entry whose name holds a
+//! control character is left out and counted, as Grep does, so no name
+//! can forge a line of the tree. Names come back as untrusted output.
 //!
 //! Grep is real. It searches the files under a path with a Rust regular
 //! expression, in path order, and prints each matching line as `N:text`
@@ -95,6 +96,8 @@
 //!   `runvil_plugin_sdk::entry::<Std>` to the Harness.
 //! - The crate names no async runtime and no filesystem of its own. Every
 //!   operation reaches files through the call's `ToolCall`.
+//! - Production code keeps nothing in a `static`. The Plugin instance
+//!   owns the parsed definitions, so an unload frees them.
 //! - The source of each tool sits in its own module, named after the last
 //!   segment of the tool's Lua id. A stub has no module.
 //! - A tool's wire name, description, and parameter schema come from its
@@ -126,26 +129,39 @@ mod source;
 mod spec;
 mod text;
 
+use std::sync::Arc;
+
 use runvil_plugin_sdk::{Pack, PackInfo, Plugin, Refusal};
 
 pub use crate::pack::NOT_IMPLEMENTED;
+use crate::spec::Definition;
 
-/// The Plugin instance the Host holds while the Plugin is loaded. It has
-/// no state: nothing is shared between runs.
+/// The Plugin instance the Host holds while the Plugin is loaded. It
+/// holds the tools' definitions, parsed once when the Plugin loads, which
+/// every run shares. Nothing else is shared between runs, and nothing
+/// outlives the instance.
 #[derive(Debug)]
-pub struct Std;
+pub struct Std {
+    definitions: Arc<[Definition]>,
+}
 
 impl Plugin for Std {
     const NAME: &'static str = "std";
     const VERSION: &'static str = env!("CARGO_PKG_VERSION");
     const PACKS: &'static [PackInfo] = &[pack::INFO];
 
+    /// Parses the embedded definitions. A definition that does not parse,
+    /// which can only happen after an edit, refuses the load and names
+    /// its tool.
     fn load() -> Result<Std, Refusal> {
-        Ok(Std)
+        let definitions = spec::load().map_err(|error| Refusal::new(error.message()))?;
+        Ok(Std {
+            definitions: definitions.into(),
+        })
     }
 
     fn new_pack(&self, _pack: &str) -> Result<Box<dyn Pack>, Refusal> {
-        Ok(Box::new(pack::StdPack::new()?))
+        Ok(Box::new(pack::StdPack::new(Arc::clone(&self.definitions))))
     }
 }
 

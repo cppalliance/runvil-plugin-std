@@ -290,6 +290,28 @@ fn a_named_link_is_searched_through_as_a_directory_and_then_as_a_file() {
 }
 
 #[test]
+fn a_named_link_that_cannot_be_listed_fails_the_call_in_the_words_for_its_kind() {
+    let source = FakeSource::default().with("/link", Node::LinkFails(denied()));
+    let message = failure_of(grep_over(
+        &source,
+        &json!({ "pattern": "x", "path": "/link" }),
+        &Limits::default(),
+    ));
+    assert_eq!(message, "the policy refuses it");
+}
+
+#[test]
+fn a_named_file_without_a_leading_slash_is_printed_from_the_root() {
+    let files = Files::new().file("/notes/a.md", "NEEDLE\n");
+    let output = text_of(grep_over(
+        &files,
+        &json!({ "pattern": "NEEDLE", "path": "notes/a.md" }),
+        &Limits::default(),
+    ));
+    assert_eq!(output, "/notes/a.md\n  1:NEEDLE");
+}
+
+#[test]
 fn a_named_link_to_an_over_size_file_is_a_skip_found_after_a_bounded_read() {
     let source = FakeSource::default().with("/filelink", Node::LinkToFile(vec![b'a'; 500]));
     let output = grep_over(

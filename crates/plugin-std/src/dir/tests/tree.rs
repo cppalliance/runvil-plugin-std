@@ -10,6 +10,7 @@ use crate::dir::check_directory;
 use crate::dir::render::render;
 use crate::dir::walk::{Failure, walk};
 use crate::fake::{FakeSource, Node};
+use crate::matcher::Matcher;
 use crate::refusal::refusal;
 
 /// The listing ListDir answers for `target`.
@@ -446,6 +447,98 @@ fn a_target_that_is_a_link_is_listed_through_when_it_leads_to_a_directory() {
     assert_eq!(
         failure_of(list(&source, &json!({ "target_directory": "/filelink" }))),
         "Path is not a directory: /filelink"
+    );
+}
+
+/// The note a listing ends with when it left `count` entries out for
+/// their names.
+fn left_out(count: &str) -> String {
+    format!("{count} left out: a name that holds a control character is never shown.")
+}
+
+#[test]
+fn a_name_with_a_control_character_is_left_out_and_counted() {
+    let source = FakeSource::default()
+        .file("/bad\u{1}name", "x")
+        .file("/ok.txt", "x");
+    assert_eq!(
+        text_of(list(&source, &json!({ "target_directory": "/" }))),
+        format!("/\n  - ok.txt\n\n{}", left_out("1 entry"))
+    );
+}
+
+#[test]
+fn a_name_with_a_line_feed_cannot_forge_a_line_of_the_tree() {
+    let source = FakeSource::default()
+        .file("/a\n  - forged.txt", "x")
+        .file("/tab\there", "x")
+        .file("/del\u{7f}", "x");
+    let text = text_of(list(&source, &json!({ "target_directory": "/" })));
+    assert_eq!(
+        text,
+        format!("/\n... no children found ...\n\n{}", left_out("3 entries"))
+    );
+    assert!(!text.contains("forged"), "{text}");
+}
+
+#[test]
+fn a_directory_with_a_control_character_in_its_name_is_never_entered() {
+    let lister = |path: &str| -> Result<Vec<DirEntry>, FileError> {
+        match path {
+            "/p" => Ok(vec![
+                entry("bad\rdir", FileType::Directory),
+                entry("sub", FileType::Directory),
+            ]),
+            "/p/sub" => Ok(vec![
+                entry("in\0ner", FileType::File),
+                entry("kept", FileType::File),
+            ]),
+            other => panic!("the walk entered {other:?}"),
+        }
+    };
+    let tree = walk("/p", &[], 15_000, lister).expect("the walk succeeds");
+    assert_eq!(tree.unprintable, 2, "one at each level");
+    assert_eq!(
+        render(&tree),
+        format!("/p/\n  - sub/\n    - kept\n\n{}", left_out("2 entries"))
+    );
+}
+
+#[test]
+fn an_ignored_entry_and_dot_git_are_not_counted_whatever_their_names() {
+    let lister = |_: &str| -> Result<Vec<DirEntry>, FileError> {
+        Ok(vec![
+            entry(".git", FileType::Directory),
+            entry("a\tb.log", FileType::File),
+            entry("kept", FileType::File),
+        ])
+    };
+    let ignore = [Matcher::new("*.log").expect("the pattern is valid")];
+    let tree = walk("/p", &ignore, 15_000, lister).expect("the walk succeeds");
+    assert_eq!(tree.unprintable, 0);
+    assert_eq!(render(&tree), "/p/\n  - kept");
+}
+
+#[test]
+fn the_note_for_names_follows_the_note_of_a_cut_listing() {
+    let lister = |_: &str| -> Result<Vec<DirEntry>, FileError> {
+        Ok(vec![
+            entry("a", FileType::File),
+            entry("b", FileType::File),
+            entry("c\n", FileType::File),
+        ])
+    };
+    // The root line and the line of `a` fit, and the line of `b` does not.
+    let tree = walk("/p", &[], 10, lister).expect("the walk succeeds");
+    assert!(tree.truncated);
+    let text = render(&tree);
+    assert!(
+        text.starts_with("/p/\n  - a\n    ...\n\ntarget_directory is too large"),
+        "{text}"
+    );
+    assert!(
+        text.ends_with(&format!("\n\n{}", left_out("1 entry"))),
+        "{text}"
     );
 }
 

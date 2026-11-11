@@ -3,14 +3,16 @@
 //! the stub that every tool but Read, ListDir, and Grep still answers
 //! with in this build.
 
+use std::sync::Arc;
+
 use runvil_plugin_sdk::{
-    BoxFuture, Pack, PackInfo, Refusal, ToolCall, ToolError, ToolErrorKind, ToolInfo, ToolOutput,
+    BoxFuture, Pack, PackInfo, ToolCall, ToolError, ToolErrorKind, ToolInfo, ToolOutput,
 };
 use serde_json::Value;
 
 use crate::check::make_invalid_arguments_error;
 use crate::source::Source;
-use crate::spec::{self, Definition};
+use crate::spec::Definition;
 
 /// What a call to a tool that is still a stub answers in this build, when
 /// its arguments match the schema. Read, ListDir, and Grep are real and
@@ -31,21 +33,19 @@ pub const NOT_IMPLEMENTED: &str = "The <name> tool is not implemented in this bu
 pub(crate) const INFO: PackInfo =
     PackInfo::new("runvil/std").description("Read, write, search, and delete files");
 
-/// One run's instance of the Pack: its tool list. It keeps nothing else,
-/// so each call works only on what the call lends it.
+/// One run's instance of the Pack: the definitions the Plugin parsed when
+/// it loaded, which every run shares, and the tool list made from them.
+/// It keeps nothing of a call, so each call works only on what the call
+/// lends it.
 #[derive(Debug)]
 pub(crate) struct StdPack {
+    definitions: Arc<[Definition]>,
     tools: Vec<ToolInfo>,
 }
 
 impl StdPack {
     /// Makes the instance, naming each tool by its definition's segment.
-    ///
-    /// # Errors
-    /// Returns a [`Refusal`] that names the tool whose embedded
-    /// definition does not parse, which can only happen after an edit.
-    pub(crate) fn new() -> Result<StdPack, Refusal> {
-        let definitions = spec::all().map_err(|error| Refusal::new(error.message()))?;
+    pub(crate) fn new(definitions: Arc<[Definition]>) -> StdPack {
         let tools = definitions
             .iter()
             .map(|definition| {
@@ -57,21 +57,13 @@ impl StdPack {
                 .wire_name(definition.wire_name.clone())
             })
             .collect();
-        Ok(StdPack { tools })
+        StdPack { definitions, tools }
     }
 }
 
 /// The stub text for the tool the model calls `wire_name`.
 fn stub(wire_name: &str) -> String {
     NOT_IMPLEMENTED.replace("<name>", wire_name)
-}
-
-/// The definition of the tool named `segment`.
-fn definition(segment: &str) -> Option<&'static Definition> {
-    spec::all()
-        .ok()?
-        .iter()
-        .find(|definition| definition.segment == segment)
 }
 
 /// The call's arguments, parsed from the JSON text the Host sent for the
@@ -82,11 +74,19 @@ fn parse(wire_name: &str, text: &str) -> Result<Value, ToolError> {
     })
 }
 
-/// Runs one call of the tool named `name` with `arguments`, the JSON text
-/// of its arguments, over the files `source` reaches: the schema check
-/// first, then the tool.
-async fn run(name: &str, arguments: &str, source: &impl Source) -> Result<ToolOutput, ToolError> {
-    let Some(definition) = definition(name) else {
+/// Runs one call of the tool of `definitions` named `name` with
+/// `arguments`, the JSON text of its arguments, over the files `source`
+/// reaches: the schema check first, then the tool.
+async fn run(
+    definitions: &[Definition],
+    name: &str,
+    arguments: &str,
+    source: &impl Source,
+) -> Result<ToolOutput, ToolError> {
+    let found = definitions
+        .iter()
+        .find(|definition| definition.segment == name);
+    let Some(definition) = found else {
         return Err(ToolError::new(
             ToolErrorKind::Other,
             format!("std has no tool named {name}"),
@@ -108,7 +108,7 @@ impl Pack for StdPack {
     }
 
     fn call<'a>(&'a self, call: ToolCall<'a>) -> BoxFuture<'a, Result<ToolOutput, ToolError>> {
-        Box::pin(async move { run(call.tool(), call.arguments(), &call).await })
+        Box::pin(async move { run(&self.definitions, call.tool(), call.arguments(), &call).await })
     }
 }
 

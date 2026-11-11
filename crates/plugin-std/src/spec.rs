@@ -6,8 +6,6 @@
 //! describes behavior this Pack does not have. `dir.json` is this crate's
 //! own. `schemas/EDITS.md` records every edit and why `dir.json` is new.
 
-use std::sync::LazyLock;
-
 use runvil_plugin_sdk::{ToolError, ToolErrorKind};
 use serde::Deserialize;
 use serde_json::Value;
@@ -48,9 +46,22 @@ const SOURCES: [(&str, &str); 7] = [
     ("dir", include_str!("../schemas/dir.json")),
 ];
 
-/// The parsed definitions, one per [`SOURCES`] entry in order.
-static DEFINITIONS: LazyLock<Result<Vec<Definition>, ToolError>> = LazyLock::new(|| {
-    SOURCES
+/// Every definition, parsed from the embedded files, in [`SOURCES`]
+/// order. The Plugin calls this once, when it loads, and keeps the
+/// result in its instance.
+///
+/// # Errors
+/// Returns a [`Backend`](ToolErrorKind::Backend) error naming the tool
+/// whose file does not parse. The files are embedded, so this can only
+/// happen after an edit.
+pub(crate) fn load() -> Result<Vec<Definition>, ToolError> {
+    parse(&SOURCES)
+}
+
+/// The definition of each of `sources`, an id segment beside the text of
+/// its file, in order.
+fn parse(sources: &[(&'static str, &str)]) -> Result<Vec<Definition>, ToolError> {
+    sources
         .iter()
         .map(|(segment, source)| {
             let file: File = serde_json::from_str(source).map_err(|error| {
@@ -67,7 +78,7 @@ static DEFINITIONS: LazyLock<Result<Vec<Definition>, ToolError>> = LazyLock::new
             })
         })
         .collect()
-});
+}
 
 /// `description` with the tool's `{...}` placeholders filled from the
 /// constants its code uses, so the text the model reads and the limit the
@@ -87,17 +98,15 @@ fn fill(segment: &str, description: &str) -> String {
     }
 }
 
-/// Every definition, in [`SOURCES`] order.
+/// Every definition, parsed once for the tests of every module.
 ///
-/// # Errors
-/// Returns a [`Backend`](ToolErrorKind::Backend) error naming the tool
-/// whose file does not parse. The files are embedded, so this can only
-/// happen after an edit.
-pub(crate) fn all() -> Result<&'static [Definition], ToolError> {
-    match &*DEFINITIONS {
-        Ok(definitions) => Ok(definitions),
-        Err(error) => Err(error.clone()),
-    }
+/// # Panics
+/// Panics when an embedded file does not parse.
+#[cfg(test)]
+pub(crate) fn all() -> &'static [Definition] {
+    static DEFINITIONS: std::sync::LazyLock<Vec<Definition>> =
+        std::sync::LazyLock::new(|| load().expect("every embedded definition parses"));
+    &DEFINITIONS
 }
 
 #[cfg(test)]

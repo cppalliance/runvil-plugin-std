@@ -3,9 +3,11 @@
 //! The tree prints depth first in the sorted order, one line per entry,
 //! each indented two spaces per level under a `- ` bullet, with a trailing
 //! `/` on a directory only. The lines are joined with `\n` and there is no
-//! newline after the last one.
+//! newline after the last one. A note follows the lines when the walk cut
+//! the tree, and another when it left entries out for their names.
 
 use super::walk::{Node, Tree};
+use crate::check::plural;
 
 /// The note a cut listing ends with, after the `    ...` line and a blank
 /// line.
@@ -23,9 +25,29 @@ const CUT_MARK: &str = "    ...";
 ///
 /// A root with nothing to show prints its line and then `... no children
 /// found ...`. A tree the walk cut ends with the cut mark, a blank line,
-/// and the note that says to narrow the call. The cut mark and the note
-/// do not count against the byte cap.
+/// and the note that says to narrow the call. A tree with entries left
+/// out for their names ends with a blank line and the note that counts
+/// them. The cut mark and the notes do not count against the byte cap.
 pub(super) fn render(tree: &Tree) -> String {
+    let mut text = body(tree);
+    if tree.unprintable > 0 {
+        text.push_str("\n\n");
+        text.push_str(&unprintable_note(tree.unprintable));
+    }
+    text
+}
+
+/// The note that counts the entries left out for their names.
+fn unprintable_note(count: usize) -> String {
+    format!(
+        "{} left out: a name that holds a control character is never shown.",
+        plural(count, "entry")
+    )
+}
+
+/// The lines of `tree`, with the cut mark and its note when the walk cut
+/// the tree.
+fn body(tree: &Tree) -> String {
     // The walk always seeds the root as the first node and only pushes
     // indexes it has added, so indexing the nodes cannot miss. A broken
     // tree panics here instead of printing less than the walk found.

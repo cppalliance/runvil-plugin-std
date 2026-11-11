@@ -33,7 +33,7 @@ Each file in this directory except `dir.json` is Cursor's definition of the tool
 ## dir.json
 
 - This file is new. It is not a Cursor snapshot, so none of its text is Cursor's. Cursor's counterpart, `LS`, is deprecated and gated behind a setting, so the wire name is `ListDir` rather than Cursor's. The two parameters, `target_directory` and `ignore_globs`, keep the names `LS` uses.
-- The description states what this Pack's tool does: a bullet tree with directories ending in `/`, one byte-ordered list for files and directories, a breadth-first walk that stops at `{body_cap}` bytes with a note, `.git` skipped and every other dotfile listed, links listed and not entered, and `ignore_globs` matching at any depth. The placeholder is filled when the definition is built, from the constant the code enforces, so the text and the limit cannot drift apart.
+- The description states what this Pack's tool does: a bullet tree with directories ending in `/`, one byte-ordered list for files and directories, a breadth-first walk that stops at `{body_cap}` bytes with a note, `.git` skipped and every other dotfile listed, links listed and not entered, an entry whose name holds a control character left out and counted in a note, and `ignore_globs` matching at any depth. The placeholder is filled when the definition is built, from the constant the code enforces, so the text and the limit cannot drift apart.
 - Dropped from `LS`: the extension-count summaries, the 5-second timeout, the terminal-log special case, and the `Error listing directory:` prefix.
 
 ## grep.json

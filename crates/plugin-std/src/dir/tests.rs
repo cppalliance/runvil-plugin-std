@@ -28,7 +28,6 @@ fn seeded(paths: &[&str]) -> Files {
 /// The `dir` definition the Pack builds the tool from.
 fn definition() -> &'static Definition {
     spec::all()
-        .expect("every embedded definition parses")
         .iter()
         .find(|definition| definition.segment == "dir")
         .expect("the dir definition exists")

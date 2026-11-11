@@ -229,6 +229,20 @@ fn list_dir_leaves_out_what_ignore_globs_match() {
 }
 
 #[test]
+fn list_dir_leaves_out_and_counts_a_name_that_holds_a_control_character() {
+    let files = Files::new()
+        .file("/proj/a.md", "x")
+        .file("/proj/b\n  - forged.md", "y");
+    let output = call_over(files, "dir", &json!({ "target_directory": "/proj" }))
+        .expect("the directory lists");
+    assert_eq!(
+        output.text(),
+        "/proj/\n  - a.md\n\n\
+         1 entry left out: a name that holds a control character is never shown."
+    );
+}
+
+#[test]
 fn grep_answers_the_matching_lines_of_a_tree_as_untrusted_output() {
     let files = Files::new()
         .file(

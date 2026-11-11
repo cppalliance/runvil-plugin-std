@@ -1,7 +1,9 @@
 //! The definitions: one file per tool, each parsed, each carrying its
 //! wire name.
 
-use super::all;
+use runvil_plugin_sdk::ToolErrorKind;
+
+use super::{all, parse};
 
 /// The wire name each id segment must carry: Cursor's name for the same
 /// tool, except `ListDir`, which is this Pack's own.
@@ -17,7 +19,7 @@ const WIRE_NAMES: [(&str, &str); 7] = [
 
 #[test]
 fn every_definition_parses_and_keeps_the_wire_name_it_was_snapshotted_with() {
-    let definitions = all().expect("every embedded definition parses");
+    let definitions = all();
     let read: Vec<(&str, &str)> = definitions
         .iter()
         .map(|definition| (definition.segment, definition.wire_name.as_str()))
@@ -26,8 +28,33 @@ fn every_definition_parses_and_keeps_the_wire_name_it_was_snapshotted_with() {
 }
 
 #[test]
+fn a_file_that_does_not_parse_fails_naming_its_tool_and_no_definition_is_kept() {
+    let good = r#"{"wire_name":"Read","description":"Reads.","parameters":{"type":"object"}}"#;
+    let parsed = parse(&[("read", good)]).expect("the file parses");
+    assert_eq!(parsed.len(), 1);
+    assert_eq!(parsed[0].wire_name, "Read");
+
+    let error =
+        parse(&[("read", good), ("grep", "{ not json")]).expect_err("the second file is not JSON");
+    assert_eq!(error.kind(), ToolErrorKind::Backend);
+    assert!(
+        error
+            .message()
+            .starts_with("std could not read the definition of its grep tool: "),
+        "{error}"
+    );
+
+    let missing =
+        parse(&[("dir", r#"{"wire_name":"ListDir"}"#)]).expect_err("the file lacks a description");
+    assert!(
+        missing.message().contains("its dir tool"),
+        "the error names the tool: {missing}"
+    );
+}
+
+#[test]
 fn every_definition_holds_a_description_and_an_object_schema_with_at_least_one_property() {
-    for definition in all().expect("every embedded definition parses") {
+    for definition in all() {
         assert!(
             !definition.description.trim().is_empty(),
             "the {} tool has a description",
@@ -55,7 +82,7 @@ fn every_definition_holds_a_description_and_an_object_schema_with_at_least_one_p
 
 #[test]
 fn every_required_parameter_is_one_the_schema_declares_and_describes() {
-    for definition in all().expect("every embedded definition parses") {
+    for definition in all() {
         let Some(required) = definition
             .parameters
             .get("required")
@@ -90,7 +117,7 @@ fn every_required_parameter_is_one_the_schema_declares_and_describes() {
 
 #[test]
 fn the_read_description_holds_the_limits_the_code_uses_and_no_unfilled_placeholder() {
-    let definitions = all().expect("every embedded definition parses");
+    let definitions = all();
     let read = definitions
         .iter()
         .find(|definition| definition.segment == "read")
@@ -116,7 +143,7 @@ fn the_read_description_holds_the_limits_the_code_uses_and_no_unfilled_placehold
 
 #[test]
 fn the_dir_description_holds_the_body_cap_and_no_unfilled_placeholder() {
-    let definitions = all().expect("every embedded definition parses");
+    let definitions = all();
     let dir = definitions
         .iter()
         .find(|definition| definition.segment == "dir")
@@ -131,7 +158,7 @@ fn the_dir_description_holds_the_body_cap_and_no_unfilled_placeholder() {
 
 #[test]
 fn the_dir_schema_requires_the_target_and_takes_an_array_of_strings_for_the_ignores() {
-    let definitions = all().expect("every embedded definition parses");
+    let definitions = all();
     let dir = definitions
         .iter()
         .find(|definition| definition.segment == "dir")
@@ -148,7 +175,7 @@ fn the_dir_schema_requires_the_target_and_takes_an_array_of_strings_for_the_igno
 
 #[test]
 fn the_dir_description_states_the_behavior_the_tool_has() {
-    let definitions = all().expect("every embedded definition parses");
+    let definitions = all();
     let dir = definitions
         .iter()
         .find(|definition| definition.segment == "dir")
@@ -162,6 +189,7 @@ fn the_dir_description_states_the_behavior_the_tool_has() {
         "ignore_globs",
         "any depth",
         "byte order",
+        "control character",
     ] {
         assert!(
             text.contains(phrase),
@@ -172,7 +200,7 @@ fn the_dir_description_states_the_behavior_the_tool_has() {
 
 #[test]
 fn the_read_schema_takes_integers_for_offset_and_limit() {
-    let definitions = all().expect("every embedded definition parses");
+    let definitions = all();
     let read = definitions
         .iter()
         .find(|definition| definition.segment == "read")
@@ -187,7 +215,7 @@ fn the_read_schema_takes_integers_for_offset_and_limit() {
 
 #[test]
 fn no_definition_names_behavior_this_build_does_not_have() {
-    for definition in all().expect("every embedded definition parses") {
+    for definition in all() {
         let text = format!("{} {}", definition.description, definition.parameters);
         for absent in ["PDF", "Shell tool", "Cursor workspace"] {
             assert!(
@@ -202,7 +230,6 @@ fn no_definition_names_behavior_this_build_does_not_have() {
 /// The `grep` definition.
 fn grep_definition() -> &'static super::Definition {
     all()
-        .expect("every embedded definition parses")
         .iter()
         .find(|definition| definition.segment == "grep")
         .expect("the grep definition exists")

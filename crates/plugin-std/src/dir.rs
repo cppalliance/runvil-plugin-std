@@ -5,8 +5,9 @@
 //! at most 15,000 bytes of lines: when the next line would pass that, the
 //! walk stops and the answer says so. Directories end in `/`, files and
 //! directories share one byte-ordered list, entries named `.git` are
-//! skipped, and a link is listed and never entered. The names are
-//! untrusted output.
+//! skipped, and a link is listed and never entered. An entry whose name
+//! holds a control character is left out and counted in a note. The
+//! names are untrusted output.
 
 mod args;
 mod render;

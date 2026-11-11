@@ -24,7 +24,6 @@ fn seeded(path: &str, bytes: &[u8]) -> Files {
 /// The `read` definition the Pack builds the tool from.
 fn definition() -> &'static Definition {
     spec::all()
-        .expect("every embedded definition parses")
         .iter()
         .find(|definition| definition.segment == "read")
         .expect("the read definition exists")

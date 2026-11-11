@@ -1,16 +1,27 @@
-//! The order and the one name the directory-walking tools share.
+//! What the directory-walking tools share: the order of a walk, the one
+//! name a walk skips, and the names a walk never prints.
 //!
 //! ListDir and Grep both walk a directory tree, and the order they visit
 //! entries in is a promise to the model: it is the order the Engine's
 //! `Access::glob` gives, so a walk and a glob over the same tree list the
-//! same paths in the same sequence. Both tools take the order and the
-//! skipped name from here, so the two cannot drift apart.
+//! same paths in the same sequence. Both tools take all three from here,
+//! so the two cannot drift apart.
 
 use runvil_plugin_sdk::{DirEntry, FileType};
 
 /// The name of the entry a walk skips, a file or a directory, at any
 /// depth.
 pub(crate) const GIT: &str = ".git";
+
+/// Whether `name` holds a control character: one below U+0020, or
+/// U+007F.
+///
+/// A walk never prints such a name, because a line feed in it would forge
+/// a line of the answer. It counts the entry instead, and does not enter
+/// it.
+pub(crate) fn has_control(name: &str) -> bool {
+    name.chars().any(|c| c < ' ' || c == '\u{7f}')
+}
 
 /// `entries` in the order a walk visits them: by name, with `/` added to
 /// a directory's name.

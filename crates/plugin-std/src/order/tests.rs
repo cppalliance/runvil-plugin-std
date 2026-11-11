@@ -3,7 +3,7 @@
 
 use runvil_plugin_sdk::{DirEntry, FileType, Stat};
 
-use super::{GIT, sorted};
+use super::{GIT, has_control, sorted};
 
 /// An entry called `name` of the given kind.
 fn entry(name: &str, file_type: FileType) -> DirEntry {
@@ -53,4 +53,14 @@ fn the_order_does_not_depend_on_the_order_listed() {
 #[test]
 fn the_skipped_name_is_dot_git() {
     assert_eq!(GIT, ".git");
+}
+
+#[test]
+fn a_name_holds_a_control_character_below_a_space_or_at_delete() {
+    for name in ["a\nb", "\tx", "a\u{1}", "a\u{1f}b", "a\u{7f}", "\0"] {
+        assert!(has_control(name), "{name:?}");
+    }
+    for name in ["", "a b", "a.txt", "caf\u{e9}", "a\u{80}", "~"] {
+        assert!(!has_control(name), "{name:?}");
+    }
 }

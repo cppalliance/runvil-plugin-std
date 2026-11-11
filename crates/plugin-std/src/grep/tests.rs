@@ -62,7 +62,6 @@ fn seeded(files: &[(&str, &str)]) -> Files {
 /// The `grep` definition the Pack builds the tool from.
 fn definition() -> &'static Definition {
     spec::all()
-        .expect("every embedded definition parses")
         .iter()
         .find(|definition| definition.segment == "grep")
         .expect("the grep definition exists")

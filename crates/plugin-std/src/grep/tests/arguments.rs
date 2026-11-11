@@ -23,6 +23,15 @@ fn parsed(args: &Value) -> args::Request<'_> {
 }
 
 #[test]
+fn a_count_that_is_not_a_number_reads_as_left_out_when_no_schema_check_ran() {
+    // The schema check refuses such a value first, so only a caller that
+    // skips the check can reach this.
+    let args = json!({ "pattern": "x", "-A": "3", "head_limit": true });
+    let request = parsed(&args);
+    assert_eq!((request.after, request.limit), (0, None));
+}
+
+#[test]
 fn a_missing_pattern_names_the_parameter() {
     let error = grep(&Files::new(), &json!({})).expect_err("pattern is required");
     assert_eq!(

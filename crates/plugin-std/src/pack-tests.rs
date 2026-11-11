@@ -3,18 +3,19 @@
 
 use std::future::Future;
 use std::pin::pin;
+use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 
 use runvil_plugin_sdk::testing::Files;
 use runvil_plugin_sdk::{ToolError, ToolErrorKind, ToolOutput};
 
 use super::{INFO, NOT_IMPLEMENTED, StdPack, parse, run};
-use crate::spec;
+use crate::spec::{self, Definition};
 
 /// Runs one call of the tool `name` with `arguments` over `files` to its
 /// end, polling again after each `Pending`.
 fn ran(name: &str, arguments: &str, files: &Files) -> Result<ToolOutput, ToolError> {
-    let mut future = pin!(run(name, arguments, files));
+    let mut future = pin!(run(spec::all(), name, arguments, files));
     let mut cx = Context::from_waker(Waker::noop());
     loop {
         if let Poll::Ready(result) = future.as_mut().poll(&mut cx) {
@@ -67,7 +68,6 @@ fn the_stub_says_what_is_missing_before_it_says_anything_else() {
 #[test]
 fn the_specs_are_the_seven_the_crate_names_in_order() {
     let segments: Vec<&str> = spec::all()
-        .expect("every embedded definition parses")
         .iter()
         .map(|definition| definition.segment)
         .collect();
@@ -79,10 +79,10 @@ fn the_specs_are_the_seven_the_crate_names_in_order() {
 
 #[test]
 fn an_instance_names_each_tool_by_its_segment_with_its_schema_as_json_text() {
-    let pack = StdPack::new().expect("every embedded definition parses");
-    let definitions = spec::all().expect("every embedded definition parses");
+    let definitions: Arc<[Definition]> = spec::load().expect("every definition parses").into();
+    let pack = StdPack::new(Arc::clone(&definitions));
     assert_eq!(pack.tools.len(), definitions.len());
-    for (tool, definition) in pack.tools.iter().zip(definitions) {
+    for (tool, definition) in pack.tools.iter().zip(definitions.iter()) {
         assert_eq!(tool.name, definition.segment);
         assert_eq!(
             tool.wire_name.as_deref(),

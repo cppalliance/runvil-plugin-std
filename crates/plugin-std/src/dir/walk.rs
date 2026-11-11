@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 use runvil_plugin_sdk::{DirEntry, FileError, FileErrorKind, FileType};
 
 use crate::matcher::Matcher;
-use crate::order::{GIT, sorted};
+use crate::order::{GIT, has_control, sorted};
 
 /// One line of the tree: a name under its parent.
 #[derive(Debug)]
@@ -38,6 +38,9 @@ pub(super) struct Tree {
     pub(super) nodes: Vec<Node>,
     /// Whether the walk stopped because the next line would pass the cap.
     pub(super) truncated: bool,
+    /// How many entries the walk met and left out because their names
+    /// hold a control character.
+    pub(super) unprintable: usize,
 }
 
 /// A listing that failed and ended the walk.
@@ -66,7 +69,9 @@ struct Pending {
 ///
 /// `target` is the path as the model wrote it. `ignore` leaves out each
 /// entry whose absolute virtual path a pattern matches, and a left-out
-/// directory is not entered. The walk counts the bytes of every line it
+/// directory is not entered. An entry whose name holds a control
+/// character is left out too, and counted, because a line feed in a name
+/// would forge a line of the tree. The walk counts the bytes of every line it
 /// adds, the root's included, each with its newline, and when the next line
 /// would pass `cap` it stops everything: the directory being listed keeps
 /// the children already added, and every directory shown but not expanded
@@ -104,6 +109,7 @@ where
         depth: 1,
     }]);
     let mut truncated = false;
+    let mut unprintable = 0;
     while let Some(pending) = queue.pop_front() {
         let entries = match list(&pending.path) {
             Ok(entries) => entries,
@@ -117,7 +123,9 @@ where
                 return Err(Failure { path, error });
             }
         };
-        for entry in visible(entries, &pending.path, ignore) {
+        let (shown, left_out) = visible(entries, &pending.path, ignore);
+        unprintable += left_out;
+        for entry in shown {
             let directory = matches!(entry.stat.file_type, FileType::Directory);
             let cost = line_cost(pending.depth, &entry.name, directory);
             if used + cost > cap {
@@ -151,6 +159,7 @@ where
         root_line,
         nodes,
         truncated,
+        unprintable,
     })
 }
 
@@ -164,14 +173,23 @@ fn is_gone(error: &FileError) -> bool {
     )
 }
 
-/// The entries of one directory the tree shows, in order: everything but
-/// `.git` and what `ignore` matches, in the shared walk order.
-fn visible(entries: Vec<DirEntry>, directory: &str, ignore: &[Matcher]) -> Vec<DirEntry> {
+/// The entries of one directory the tree shows, in the shared walk order,
+/// and how many were left out for a name that holds a control character.
+///
+/// The tree shows everything but `.git`, what `ignore` matches, and such
+/// names. An entry `ignore` matches is not counted, whatever its name.
+fn visible(entries: Vec<DirEntry>, directory: &str, ignore: &[Matcher]) -> (Vec<DirEntry>, usize) {
+    let mut left_out = 0;
     let kept: Vec<DirEntry> = entries
         .into_iter()
         .filter(|entry| entry.name != GIT && !is_ignored(directory, &entry.name, ignore))
+        .filter(|entry| {
+            let printable = !has_control(&entry.name);
+            left_out += usize::from(!printable);
+            printable
+        })
         .collect();
-    sorted(kept)
+    (sorted(kept), left_out)
 }
 
 /// Whether a pattern in `ignore` matches the entry `name` of `directory`,

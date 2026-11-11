@@ -13,7 +13,7 @@ use super::args::{Mode, Request};
 use super::found::{Found, Limits, Reason, Stop};
 use super::matching::each_match_line;
 use super::types;
-use crate::order::{GIT, sorted};
+use crate::order::{GIT, has_control, sorted};
 use crate::refusal::{missing_root, neither_file_nor_directory, refusal};
 use crate::source::Source;
 use crate::text::{decode, sniff_binary, split_lines};
@@ -119,7 +119,7 @@ pub(super) async fn find<S: Source>(
     };
     match stat.file_type {
         FileType::Directory => search.directory(root).await?,
-        FileType::File => search.root_file(root, Some(stat.size))?,
+        FileType::File => search.root_file(root, Some(stat.len))?,
         FileType::Symlink => search.link(root).await?,
         _ => return Err(neither_file_nor_directory(root)),
     }
@@ -230,7 +230,7 @@ impl<S: Source> Search<'_, '_, S> {
                 continue;
             }
             let child = frame.dir.join(&entry.name);
-            if entry.name.chars().any(|c| c < ' ' || c == '\u{7f}') {
+            if has_control(&entry.name) {
                 self.skip(Reason::ControlName, None);
                 continue;
             }
@@ -250,7 +250,7 @@ impl<S: Source> Search<'_, '_, S> {
                     self.pace().await;
                 }
                 FileType::File => {
-                    self.visit(&child, &entry.name, entry.stat.size);
+                    self.visit(&child, &entry.name, entry.stat.len);
                     self.pace().await;
                 }
                 // A pipe, a socket, or a device is never opened: reading one

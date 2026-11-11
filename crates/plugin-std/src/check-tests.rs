@@ -44,6 +44,49 @@ fn matching_arguments_pass() {
 }
 
 #[test]
+fn a_schema_that_declares_no_properties_or_no_type_checks_nothing_there() {
+    let bare = json!({ "type": "object" });
+    assert!(check("Read", &bare, &json!({ "x": 1 })).is_ok());
+    let untyped = json!({ "type": "object", "properties": { "x": {} } });
+    assert!(check("Read", &untyped, &json!({ "x": [1, "two"] })).is_ok());
+}
+
+#[test]
+fn an_object_and_a_null_type_are_checked_and_an_unknown_type_is_refused_by_name() {
+    let schema = json!({
+        "type": "object",
+        "properties": {
+            "o": { "type": "object" },
+            "n": { "type": "null" },
+            "t": { "type": "tuple" }
+        }
+    });
+    assert!(check("Read", &schema, &json!({ "o": { "a": 1 } })).is_ok());
+    assert_eq!(
+        refused_as("Read", &schema, &json!({ "o": 3 })),
+        "std_Read: `o` must be a JSON object, and the call passed 3"
+    );
+    // A null value is a parameter left out, so a `null` type never sees one.
+    assert!(check("Read", &schema, &json!({ "n": null })).is_ok());
+    assert_eq!(
+        refused_as("Read", &schema, &json!({ "n": 0 })),
+        "std_Read: `n` must be a JSON null, and the call passed 0"
+    );
+    assert_eq!(
+        refused_as("Read", &schema, &json!({ "t": 1 })),
+        "std_Read: `t` has a schema type tuple this build does not know"
+    );
+}
+
+/// The message `tool` refuses `args` with against `schema`.
+fn refused_as(tool: &str, schema: &serde_json::Value, args: &serde_json::Value) -> String {
+    match check(tool, schema, args) {
+        Ok(()) => panic!("{args} is refused"),
+        Err(error) => error.to_string(),
+    }
+}
+
+#[test]
 fn a_null_argument_list_reads_as_an_empty_object() {
     let schema = json!({ "type": "object", "properties": {} });
     assert!(check("Read", &schema, &json!(null)).is_ok());

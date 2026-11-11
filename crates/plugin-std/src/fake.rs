@@ -22,6 +22,9 @@ pub(crate) enum Node {
     Link,
     /// A symbolic link to a file with these bytes.
     LinkToFile(Vec<u8>),
+    /// A symbolic link that fails with this error when it is listed or
+    /// read.
+    LinkFails(FileError),
     /// A pipe.
     Pipe,
     /// A file whose listing says it holds this many bytes, and whose
@@ -59,7 +62,9 @@ impl FakeSource {
             Node::Sized(size, _) => Stat::new(FileType::File, *size),
             Node::ReadFails(_) => Stat::new(FileType::File, 1),
             Node::ListFails(_) => Stat::new(FileType::Directory, 0),
-            Node::Link | Node::LinkToFile(_) => Stat::new(FileType::Symlink, 0),
+            Node::Link | Node::LinkToFile(_) | Node::LinkFails(_) => {
+                Stat::new(FileType::Symlink, 0)
+            }
             Node::Pipe => Stat::new(FileType::Other, 0),
         }
     }
@@ -94,7 +99,9 @@ impl Source for FakeSource {
         if path != "/" {
             match self.nodes.get(path) {
                 None => return Err(Self::missing(path)),
-                Some(Node::ListFails(error)) => return Err(error.clone()),
+                Some(Node::ListFails(error) | Node::LinkFails(error)) => {
+                    return Err(error.clone());
+                }
                 Some(Node::Link) => {}
                 Some(_) => {
                     return Err(FileError::new(
@@ -117,7 +124,7 @@ impl Source for FakeSource {
             Some(Node::File(bytes) | Node::Sized(_, bytes) | Node::LinkToFile(bytes)) => {
                 Ok(bytes.clone())
             }
-            Some(Node::ReadFails(error)) => Err(error.clone()),
+            Some(Node::ReadFails(error) | Node::LinkFails(error)) => Err(error.clone()),
             Some(Node::Link | Node::ListFails(_)) => Err(FileError::new(
                 FileErrorKind::IsADirectory,
                 format!("is a directory: {path}"),
