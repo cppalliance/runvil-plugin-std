@@ -14,6 +14,7 @@ use serde_json::Value;
 
 use super::args::Request;
 use crate::matcher::Matcher;
+use crate::source::Source;
 use crate::spec::{self, Definition};
 
 /// A tree with one small file at each of `paths`, and every directory on
@@ -35,7 +36,7 @@ fn definition() -> &'static Definition {
 
 /// Calls ListDir over `files` with `args` as the Pack does: the schema
 /// check first, then the tool.
-fn list(files: &Files, args: &Value) -> Result<ToolOutput, ToolError> {
+fn list(files: &impl Source, args: &Value) -> Result<ToolOutput, ToolError> {
     let definition = definition();
     crate::check::check(&definition.wire_name, &definition.parameters, args)?;
     super::call(files, definition, args)

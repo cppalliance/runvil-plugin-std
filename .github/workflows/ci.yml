@@ -52,6 +52,12 @@ jobs:
       - name: Build the library Plugin
         run: cargo build --locked -p plugin-std --release
 
+      # A Host finds the Plugin by this one symbol, and a build without
+      # the `dll` feature would still write a library, with no export.
+      - name: The library exports runvil_plugin
+        if: runner.os == 'Linux'
+        run: nm -D --defined-only target/release/libplugin_std.so | grep -qw runvil_plugin
+
       # No build or test step may write into the repository; catch a
       # regression here rather than in a diff.
       - name: Clean tree
@@ -73,5 +79,7 @@ jobs:
       - name: Cache cargo
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
 
+      # Almost every item is private, so rustdoc checks their docs only
+      # with `--document-private-items`.
       - name: Docs
-        run: cargo doc --locked --workspace --no-deps --all-features
+        run: cargo doc --locked --workspace --no-deps --all-features --document-private-items

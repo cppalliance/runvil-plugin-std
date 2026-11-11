@@ -13,6 +13,7 @@ use runvil_plugin_sdk::{ToolError, ToolOutput};
 use serde_json::Value;
 
 use super::args::Request;
+use crate::source::Source;
 use crate::spec::{self, Definition};
 
 /// A tree with `bytes` at `path`.
@@ -31,7 +32,7 @@ fn definition() -> &'static Definition {
 
 /// Calls Read over `files` with `args` as the Pack does: the schema check
 /// first, then the tool.
-fn read(files: &Files, args: &Value) -> Result<ToolOutput, ToolError> {
+fn read(files: &impl Source, args: &Value) -> Result<ToolOutput, ToolError> {
     let definition = definition();
     crate::check::check(&definition.wire_name, &definition.parameters, args)?;
     super::call(files, definition, args)

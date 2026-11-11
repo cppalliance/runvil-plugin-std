@@ -1,11 +1,11 @@
 //! The file operations the tools need, behind a trait.
 //!
 //! The call's [`ToolCall`] implements it, so every operation a tool
-//! performs goes through the Host, and the run's mode and policy apply.
-//! The seam exists so that a test can run a tool's own code over a tree
-//! it builds, and can supply what a plain tree cannot hold: a symbolic
-//! link, a name with a control character, an over-size entry, a denied
-//! read, and a claim conflict.
+//! performs goes through the Host, and the run's policy applies. The seam
+//! exists so that a test can run a tool's own code over a tree it builds:
+//! the SDK's `testing::Files`, or this crate's `FakeSource` for what that
+//! tree cannot hold, such as a link, a pipe, and a read that fails after
+//! the stat succeeded.
 
 use runvil_plugin_sdk::{DirEntry, FileError, Stat, ToolCall};
 

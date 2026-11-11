@@ -1,7 +1,7 @@
 //! The `ListDir` tool: a bullet tree of a directory, listed breadth first.
 //!
 //! ListDir stats the directory the call names and walks it through the
-//! call's [`Source`], so the run's mode and policy apply. The tree holds
+//! call's [`Source`], so the run's policy applies. The tree holds
 //! at most 15,000 bytes of lines: when the next line would pass that, the
 //! walk stops and the answer says so. Directories end in `/`, files and
 //! directories share one byte-ordered list, entries named `.git` are

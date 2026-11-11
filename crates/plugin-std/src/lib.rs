@@ -18,7 +18,8 @@
 //! A script calls a tool by its Lua id, `tools.call("std/read", { path =
 //! "/notes.md" })`, and offers it to the model with `tools.offer("std")`
 //! or `tools.offer("std/read")`. The model then calls it by its wire name,
-//! `Read`, which is Cursor's name for the same tool.
+//! `Read`. Each wire name is Cursor's name for the same tool, except
+//! `ListDir`, which is this Pack's own.
 //!
 //! The Pack has no prelude, so declaring it, as in `uses: [std]`, only
 //! makes it required. It takes no configuration.
@@ -30,13 +31,14 @@
 //!
 //! # The definitions
 //!
-//! Each tool's description and parameter schema live in a JSON file under
-//! `schemas/`, embedded at build time. They are Cursor's own
-//! definitions, so a model that knows Cursor's tools already knows these,
-//! with the lines that describe behavior this Pack does not have removed.
-//! `schemas/EDITS.md` lists every such edit. ListDir's definition is this
-//! crate's own, because Cursor's counterpart is deprecated, and the same
-//! file says so.
+//! Each tool's wire name, description, and parameter schema live in a
+//! JSON file under `schemas/`, embedded at build time. The files start
+//! from Cursor's definitions of the same tools, so a model that knows
+//! Cursor's tools knows these names and most of these parameters. Where
+//! Cursor's text describes behavior this Pack does not have, the text is
+//! edited, and `schemas/EDITS.md` lists every such edit. ListDir's
+//! definition is this crate's own, because Cursor's counterpart is
+//! deprecated, and the same file says so.
 //!
 //! # This build
 //!
@@ -56,12 +58,13 @@
 //! Grep is real. It searches the files under a path with a Rust regular
 //! expression, in path order, and prints each matching line as `N:text`
 //! with optional context lines as `N-text`, where `N` is the line number
-//! Read shows. Output stops at 15,000 bytes, a call with an `offset`
-//! pages through the same result, and a binary file, a link, an over-size
-//! file, and an entry that cannot be read are skipped and counted, never
-//! a failure. A search ends its step now and then, so a cancel or a stop
-//! can drop it between two steps. File text comes back as untrusted
-//! output.
+//! Read shows. The lines stop at 15,000 bytes, with the notes under them
+//! not counted, a call with an `offset` pages through the same result,
+//! and a binary file, a link, an over-size file, and an entry that cannot
+//! be read are skipped and counted, never a failure. A search ends its
+//! step every 32 files or directories, or every 2 MiB read, so a cancel
+//! or a stop can drop it between two steps. File text comes back as
+//! untrusted output.
 //!
 //! Write, StrReplace, Delete, and Glob are still stubs: a call with
 //! arguments that match the schema answers [`NOT_IMPLEMENTED`]. For every
@@ -73,11 +76,12 @@
 //!
 //! Every filesystem operation a tool performs goes through its
 //! [`ToolCall`](runvil_plugin_sdk::ToolCall), never the disk directly.
-//! The Host answers each one under the run's mode and policy, so a read
-//! the policy denies fails without the Pack deciding anything. The tools
-//! only report the resulting
-//! [`FileError`](runvil_plugin_sdk::FileError) as a tool error the model
-//! can read.
+//! The Host answers each one under the run's policy, so a read the policy
+//! denies fails without the Pack deciding anything. A tool reports the
+//! [`FileError`](runvil_plugin_sdk::FileError) for the path its call
+//! names as a tool error the model can read. Below that path, ListDir
+//! fails the same way on a directory that is there and cannot be listed,
+//! and Grep skips the entry and counts it.
 //!
 //! Shell is deliberately absent. An in-process shell over the same
 //! filesystem is a separate Pack, so a run that wants one declares it.
@@ -92,10 +96,12 @@
 //! - The crate names no async runtime and no filesystem of its own. Every
 //!   operation reaches files through the call's `ToolCall`.
 //! - The source of each tool sits in its own module, named after the last
-//!   segment of the tool's Lua id.
-//! - A tool's description and parameter schema come from its JSON file
-//!   unchanged, except for the edits `schemas/EDITS.md` lists. A test per
-//!   tool holds the wire name in place.
+//!   segment of the tool's Lua id. A stub has no module.
+//! - A tool's wire name, description, and parameter schema come from its
+//!   JSON file. The one change made at build time fills the `{...}`
+//!   placeholders of a description from the constants the code enforces.
+//!   `schemas/EDITS.md` lists how each file differs from Cursor's
+//!   definition, and a test holds every wire name in place.
 //! - A call whose arguments the schema refuses is an
 //!   [`InvalidArguments`](runvil_plugin_sdk::ToolErrorKind::InvalidArguments)
 //!   failure that names the parameter. No other outcome reports the
@@ -108,6 +114,8 @@
 
 mod check;
 mod dir;
+#[cfg(test)]
+mod fake;
 mod grep;
 mod matcher;
 mod order;

@@ -7,9 +7,9 @@ edition = "2024"
 license = "BSL-1.0"
 
 [workspace.dependencies]
-# The Plugin SDK at contract 0.4, pinned to the commit the Harness's loader
-# speaks. `version` beside `git` keeps cargo-deny's wildcard check quiet.
-runvil-plugin-sdk = { version = "0.4.0", git = "https://github.com/cppalliance/runvil-plugin-api", rev = "04574e32cf901437db40797aa4efcda90489b711" }
+# The Plugin SDK at contract 0.4, pinned to a commit. A Host loads this
+# Plugin only when its Harness speaks the same contract version.
+runvil-plugin-sdk = { version = "0.4.0", git = "https://github.com/cppalliance/runvil-plugin-api", rev = "aa4fe026288c5876fc5e6ad40d19db1f18505613" }
 # Each tool's definition is embedded JSON, and a call's arguments arrive
 # as JSON text.
 serde = { version = "1", features = ["derive"] }

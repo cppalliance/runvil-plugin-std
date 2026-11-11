@@ -1,7 +1,8 @@
-//! `build-checks` - this repository's structural checks. Each check
-//! returns a list of violations a person can read, and a test asserts the
-//! list is empty, so `cargo test -p build-checks` enforces the rules in
-//! `AGENTS.md` that the compiler and clippy cannot.
+//! `build-checks` - this repository's structural checks. There is one
+//! today: the size limit on types. A check returns a list of violations a
+//! person can read, and a test asserts the list is empty, so
+//! `cargo test -p build-checks` enforces a rule in `AGENTS.md` that the
+//! compiler and clippy cannot.
 //!
 //! ## Invariants
 //!

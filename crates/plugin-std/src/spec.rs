@@ -1,11 +1,10 @@
 //! The seven tool definitions this crate ships, each an embedded JSON file.
 //!
 //! A file holds the name the model calls the tool by, the description the
-//! model reads, and the JSON Schema its arguments must match. The names,
-//! descriptions, and schemas are Cursor's own, with the lines that
-//! describe behavior this Pack does not have removed, except for
-//! `dir.json`, which is this crate's own; `schemas/EDITS.md` records each
-//! of those edits and why `dir.json` is new.
+//! model reads, and the JSON Schema its arguments must match. The files
+//! start from Cursor's definitions of the same tools, edited where a line
+//! describes behavior this Pack does not have. `dir.json` is this crate's
+//! own. `schemas/EDITS.md` records every edit and why `dir.json` is new.
 
 use std::sync::LazyLock;
 

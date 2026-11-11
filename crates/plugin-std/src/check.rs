@@ -224,8 +224,8 @@ pub(crate) fn plural(n: usize, noun: &str) -> String {
     format!("{n} {noun}s")
 }
 
-/// An invalid-arguments error whose message opens with the tool's id
-/// segment.
+/// An invalid-arguments error for the tool the model calls `tool`. Its
+/// message opens with `std_` and that name, as in `std_Read: ...`.
 pub(crate) fn make_invalid_arguments_error(
     tool: &str,
     reason: impl std::fmt::Display,

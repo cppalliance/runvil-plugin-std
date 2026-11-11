@@ -6,6 +6,7 @@ use runvil_plugin_sdk::{FileError, FileErrorKind, FileType};
 use serde_json::json;
 
 use super::{failure_of, read, read_capped, seeded, text_of};
+use crate::fake::{FakeSource, Node};
 use crate::read::{BYTE_CAP, check_type};
 
 #[test]
@@ -57,6 +58,66 @@ fn a_read_the_policy_denies_fails_with_the_policys_own_reason() {
     assert_eq!(
         failure_of(read(&files, &json!({ "path": "/secret.rs" }))),
         reason
+    );
+}
+
+#[test]
+fn a_read_that_fails_after_the_stat_succeeded_is_worded_by_its_kind() {
+    let fails = |kind, text: &str| Node::ReadFails(FileError::new(kind, text));
+    let source = FakeSource::default()
+        .with(
+            "/busy.md",
+            fails(FileErrorKind::Conflict, "conflicting claim: another call"),
+        )
+        .with(
+            "/denied.md",
+            fails(
+                FileErrorKind::Denied,
+                "Reading /denied.md is denied by policy.",
+            ),
+        )
+        .with(
+            "/io.md",
+            fails(FileErrorKind::Io, "other error: disk error"),
+        );
+    assert_eq!(
+        failure_of(read(&source, &json!({ "path": "/busy.md" }))),
+        "/busy.md was changed, or is being changed, by another call in this round, so it \
+         cannot be read in this round. Call Read again in your next message."
+    );
+    assert_eq!(
+        failure_of(read(&source, &json!({ "path": "/denied.md" }))),
+        "Reading /denied.md is denied by policy."
+    );
+    assert_eq!(
+        failure_of(read(&source, &json!({ "path": "/io.md" }))),
+        "I/O failure on /io.md: other error: disk error"
+    );
+}
+
+#[test]
+fn a_link_is_read_through_and_a_link_to_a_directory_is_a_directory() {
+    let source = FakeSource::default()
+        .with("/filelink", Node::LinkToFile(b"hello\n".to_vec()))
+        .with("/dirlink", Node::Link);
+    assert_eq!(
+        text_of(read(&source, &json!({ "path": "/filelink" }))),
+        "     1|hello\n"
+    );
+    assert_eq!(
+        failure_of(read(&source, &json!({ "path": "/dirlink" }))),
+        "Path is a directory, not a file: /dirlink"
+    );
+}
+
+#[test]
+fn a_pipe_is_refused_by_its_stat_and_never_read() {
+    // The fake fails a read of the pipe as not found, so this text shows
+    // that Read stopped at the stat.
+    let source = FakeSource::default().with("/pipe", Node::Pipe);
+    assert_eq!(
+        failure_of(read(&source, &json!({ "path": "/pipe" }))),
+        "Path is neither a file nor a directory: /pipe"
     );
 }
 

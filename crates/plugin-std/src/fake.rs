@@ -1,7 +1,11 @@
-//! A [`Source`] the tests build by hand, for what the fake Host's tree
-//! cannot hold: a link, a control-character name, an over-size entry, a
-//! pipe, and a directory or a file that fails only when it is listed or
-//! read.
+//! A [`Source`] the tests of every tool build by hand, for what the fake
+//! Host's tree cannot hold: a link to a directory or to a file, a pipe, a
+//! file whose listed size differs from its bytes, and a directory or a
+//! file that fails only when it is listed or read. A name may hold any
+//! character, a control character among them.
+//!
+//! Every node sits directly under `/`, or under a [`Node::Link`], which
+//! lists as a directory.
 
 use std::collections::BTreeMap;
 
@@ -11,7 +15,7 @@ use crate::source::Source;
 
 /// One node of the fake tree.
 #[derive(Debug, Clone)]
-pub(super) enum Node {
+pub(crate) enum Node {
     /// A file with these bytes.
     File(Vec<u8>),
     /// A symbolic link to a directory.
@@ -31,20 +35,20 @@ pub(super) enum Node {
 
 /// A tree of nodes by absolute path, with `/` always a directory.
 #[derive(Debug, Default)]
-pub(super) struct FakeSource {
+pub(crate) struct FakeSource {
     /// Every node but the root.
     nodes: BTreeMap<String, Node>,
 }
 
 impl FakeSource {
     /// The tree with `node` added at `path`.
-    pub(super) fn with(mut self, path: &str, node: Node) -> FakeSource {
+    pub(crate) fn with(mut self, path: &str, node: Node) -> FakeSource {
         self.nodes.insert(path.to_owned(), node);
         self
     }
 
     /// The tree with the text file `text` at `path`.
-    pub(super) fn file(self, path: &str, text: &str) -> FakeSource {
+    pub(crate) fn file(self, path: &str, text: &str) -> FakeSource {
         self.with(path, Node::File(text.as_bytes().to_vec()))
     }
 

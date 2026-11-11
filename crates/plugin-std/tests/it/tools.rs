@@ -40,7 +40,7 @@ fn the_plugin_inserts_the_one_pack_runvil_std() {
 }
 
 #[test]
-fn an_instance_adds_seven_tools_each_under_cursors_name_for_it() {
+fn an_instance_adds_seven_tools_each_under_its_wire_name() {
     let loaded = testing::load::<Std>().expect("the Plugin loads");
     let pack = loaded.new_pack(PACK).expect("the Pack instance is made");
     let names: Vec<(&str, Option<&str>)> = pack

@@ -1,7 +1,7 @@
 //! The `Read` tool: a window of a text file's lines, numbered.
 //!
 //! Read opens the path the call names through the call's [`Source`], so
-//! the run's mode and policy apply. It refuses a directory, a special
+//! the run's policy applies. It refuses a directory, a special
 //! file, a file over 16 MiB, and binary data, and it never truncates a
 //! file: a read that does not reach the last line says which offset
 //! continues it. File text is returned as untrusted output.

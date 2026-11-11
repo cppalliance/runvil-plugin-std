@@ -5,8 +5,8 @@ use serde_json::json;
 
 use runvil_plugin_sdk::testing::Files;
 
-use super::fake::FakeSource;
 use super::{grep, grep_over, seeded, text_of};
+use crate::fake::FakeSource;
 use crate::grep::found::Limits;
 
 /// Twenty-five lines, each a match.

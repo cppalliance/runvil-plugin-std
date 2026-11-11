@@ -2,7 +2,7 @@
 
 The `std` Plugin for [runvil](https://github.com/cppalliance/runvil), built as a dynamic library that a Host loads from its Plugin directory. It speaks the C contract in [runvil-plugin-api](https://github.com/cppalliance/runvil-plugin-api) through `runvil-plugin-sdk`, and depends on nothing else from runvil.
 
-The Plugin inserts one Pack, `runvil/std`, which gives a run the standard file tools a coding agent needs. A prompt declares it with `uses: [std]`, a script calls a tool by its Lua id, and a model calls it by its wire name, which is Cursor's name for the same tool.
+The Plugin inserts one Pack, `runvil/std`, which gives a run the standard file tools a coding agent needs. A prompt declares it with `uses: [std]`, a script calls a tool by its Lua id, and a model calls it by its wire name. Each wire name is Cursor's name for the same tool, except `ListDir`, which is this Pack's own.
 
 | Lua id | Name the model calls | In this build |
 |---|---|---|
@@ -14,10 +14,10 @@ The Plugin inserts one Pack, `runvil/std`, which gives a run the standard file t
 | `std/rm` | `Delete` | A stub |
 | `std/glob` | `Glob` | A stub |
 
-- Each tool's description and parameter schema is a JSON file under `crates/plugin-std/schemas`, and `EDITS.md` beside them lists how each differs from Cursor's own definition.
-- Every file a tool reads goes through the Host, so the run's mode and policy apply to each read. A read the policy denies reaches the model as the policy's own reason.
+- Each tool's wire name, description, and parameter schema is a JSON file under `crates/plugin-std/schemas`, and `EDITS.md` beside them lists how each differs from Cursor's definition.
+- Every file a tool reads goes through the Host, so the run's policy applies to each read. A read the policy denies fails the call with the policy's own reason. The one exception is an entry below the path a Grep call names, which Grep skips and counts.
 - File text and file names come back as untrusted output. The Host marks them before a model reads them.
-- A search ends its step every 32 files or 2 MiB, so the Host can cancel it between two steps.
+- A search ends its step every 32 files or directories, or every 2 MiB read, so the Host can cancel it between two steps.
 
 ## Building
 
@@ -33,12 +33,13 @@ A Host can also link the crate in. It turns the `dll` feature off, so the crate 
 
 | Task | Command |
 |---|---|
-| Test, including the structural checks | `cargo test --workspace --all-features` |
-| Lint | `cargo clippy --workspace --all-targets --all-features` |
+| Test, including the structural checks | `cargo test --locked --workspace --all-features` |
+| Lint, with `CARGO_BUILD_WARNINGS=deny` | `cargo clippy --locked --workspace --all-targets --all-features` |
 | Format | `cargo fmt --all --check` |
-| Docs | `cargo doc --workspace --no-deps --all-features` |
+| Docs, with `RUSTDOCFLAGS="-D warnings"` | `cargo doc --locked --workspace --no-deps --all-features --document-private-items` |
+| The library Plugin | `cargo build --locked -p plugin-std --release` |
 
-`AGENTS.md` holds the rules the code follows. Sizes are limited on functions and types, never on files: `clippy.toml` sets the function limits, and `crates/build-checks` checks the type limits as a test.
+CI runs these five. `AGENTS.md` holds the rules the code follows. Sizes are limited on functions and types, never on files: `clippy.toml` sets the function limits, and `crates/build-checks` checks the type limits as a test.
 
 ## Platform notes
 

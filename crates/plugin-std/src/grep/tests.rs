@@ -4,7 +4,6 @@
 //! [`Source`].
 
 mod arguments;
-mod fake;
 mod filters;
 mod paging;
 mod patterns;

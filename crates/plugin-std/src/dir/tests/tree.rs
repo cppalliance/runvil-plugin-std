@@ -9,6 +9,7 @@ use super::{failure_of, list, seeded, text_of};
 use crate::dir::check_directory;
 use crate::dir::render::render;
 use crate::dir::walk::{Failure, walk};
+use crate::fake::{FakeSource, Node};
 use crate::refusal::refusal;
 
 /// The listing ListDir answers for `target`.
@@ -408,6 +409,52 @@ fn a_conflict_below_the_root_is_worded_for_the_directory_that_conflicted() {
         refusal("ListDir", &failure.path, &failure.error),
         "notes/locked was changed, or is being changed, by another call in this round, so it \
          cannot be read in this round. Call ListDir again in your next message."
+    );
+}
+
+#[test]
+fn a_listing_that_fails_below_the_root_fails_the_tool_in_the_words_for_its_kind() {
+    let denied = FileError::new(
+        FileErrorKind::Denied,
+        "Reading /secret is denied by policy.",
+    );
+    let source = FakeSource::default()
+        .file("/a.txt", "x")
+        .with("/secret", Node::ListFails(denied));
+    assert_eq!(
+        failure_of(list(&source, &json!({ "target_directory": "/" }))),
+        "Reading /secret is denied by policy."
+    );
+    let source = FakeSource::default().with("/locked", Node::ListFails(listing_error("conflict")));
+    assert_eq!(
+        failure_of(list(&source, &json!({ "target_directory": "/" }))),
+        "/locked was changed, or is being changed, by another call in this round, so it \
+         cannot be read in this round. Call ListDir again in your next message."
+    );
+}
+
+#[test]
+fn a_target_that_is_a_link_is_listed_through_when_it_leads_to_a_directory() {
+    let source = FakeSource::default()
+        .with("/dirlink", Node::Link)
+        .file("/dirlink/a.txt", "x")
+        .with("/filelink", Node::LinkToFile(b"x".to_vec()));
+    assert_eq!(
+        text_of(list(&source, &json!({ "target_directory": "/dirlink" }))),
+        "/dirlink/\n  - a.txt"
+    );
+    assert_eq!(
+        failure_of(list(&source, &json!({ "target_directory": "/filelink" }))),
+        "Path is not a directory: /filelink"
+    );
+}
+
+#[test]
+fn a_target_that_is_a_pipe_is_not_a_directory() {
+    let source = FakeSource::default().with("/pipe", Node::Pipe);
+    assert_eq!(
+        failure_of(list(&source, &json!({ "target_directory": "/pipe" }))),
+        "Path is not a directory: /pipe"
     );
 }
 

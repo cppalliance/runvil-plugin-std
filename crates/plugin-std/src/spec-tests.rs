@@ -1,10 +1,10 @@
-//! The definitions: one file per tool, each parsed, each carrying the
-//! wire name Cursor uses for the same tool.
+//! The definitions: one file per tool, each parsed, each carrying its
+//! wire name.
 
 use super::all;
 
-/// The wire name each id segment must carry, which is Cursor's name for
-/// the same tool.
+/// The wire name each id segment must carry: Cursor's name for the same
+/// tool, except `ListDir`, which is this Pack's own.
 const WIRE_NAMES: [(&str, &str); 7] = [
     ("read", "Read"),
     ("write", "Write"),

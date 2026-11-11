@@ -1,9 +1,11 @@
 //! The sentence a model reads when a file operation fails.
 //!
 //! Every file tool turns a [`FileError`] into one of these, so the same
-//! failure reads the same in each tool. The path in a sentence is always
-//! the path as the model wrote it, never the path the Host resolved it
-//! to, so a relative `notes/a.md` is not echoed back as `/notes/a.md`.
+//! failure reads the same in each tool. A path this module writes into a
+//! sentence is the path as the model wrote it, never the path the Host
+//! resolved it to, so a relative `notes/a.md` is not echoed back as
+//! `/notes/a.md`. The Host's own words, which some sentences quote, may
+//! name the resolved path.
 
 use runvil_plugin_sdk::{FileError, FileErrorKind};
 
@@ -12,7 +14,8 @@ use runvil_plugin_sdk::{FileError, FileErrorKind};
 ///
 /// A sentence names no tool other than `tool`. A read the run's policy
 /// denies, and a failure the contract has no kind for, read as the Host's
-/// own words.
+/// own words alone. An I/O failure reads as the path and then the Host's
+/// words.
 pub(crate) fn refusal(tool: &str, path: &str, error: &FileError) -> String {
     match error.kind() {
         FileErrorKind::NotFound => format!("File not found: {path}"),

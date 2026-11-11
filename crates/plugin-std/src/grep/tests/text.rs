@@ -3,8 +3,8 @@
 
 use serde_json::json;
 
-use super::fake::{FakeSource, Node};
 use super::{grep_over, text_of};
+use crate::fake::{FakeSource, Node};
 use crate::grep::found::Limits;
 
 /// The tree with `bytes` as the file `/a.txt`.

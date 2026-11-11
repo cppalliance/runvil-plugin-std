@@ -2,11 +2,12 @@
 //! the pauses behave, through a [`Source`](crate::source::Source) that
 //! can produce what the fake Host's tree cannot.
 
+use runvil_plugin_sdk::testing::Files;
 use runvil_plugin_sdk::{FileError, FileErrorKind};
 use serde_json::json;
 
-use super::fake::{FakeSource, Node};
 use super::{block_on, count_pendings, definition, failure_of, grep_over, text_of};
+use crate::fake::{FakeSource, Node};
 use crate::grep::args;
 use crate::grep::found::Limits;
 
@@ -313,7 +314,7 @@ fn the_search_pauses_once_per_slice_of_files() {
         source = source.file(&format!("/f{index}"), "x\n");
     }
     let limits = Limits {
-        slice_files: 3,
+        slice_entries: 3,
         ..Limits::default()
     };
     let definition = definition();
@@ -322,6 +323,28 @@ fn the_search_pauses_once_per_slice_of_files() {
     let (output, pending) = count_pendings(crate::grep::search(&source, "Grep", &request, &limits));
     assert!(output.is_ok());
     assert_eq!(pending, 3, "after files 3, 6, and 9");
+}
+
+#[test]
+fn a_tree_of_directories_with_no_files_still_pauses_once_per_slice() {
+    let source = (0..7).fold(Files::new(), |tree, index| {
+        tree.dir(&format!("/d{index}/inner"))
+    });
+    let limits = Limits {
+        slice_entries: 4,
+        ..Limits::default()
+    };
+    let definition = definition();
+    let args = json!({ "pattern": "x" });
+    let request = args::parse(definition, &args).expect("the arguments parse");
+    let (output, pending) = count_pendings(crate::grep::search(&source, "Grep", &request, &limits));
+    assert_eq!(
+        output.expect("the search succeeds").text(),
+        "No matches found. Searched 0 files.\n\n\
+         [No ignore rules ran: .gitignore is not applied, and only entries named .git are \
+         skipped.]"
+    );
+    assert_eq!(pending, 3, "after directories 4, 8, and 12 of the 14");
 }
 
 #[test]
@@ -349,7 +372,7 @@ fn a_search_dropped_after_its_first_pause_leaves_the_source_usable() {
         source = source.file(&format!("/f{index}"), "x\n");
     }
     let limits = Limits {
-        slice_files: 2,
+        slice_entries: 2,
         ..Limits::default()
     };
     let definition = definition();

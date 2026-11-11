@@ -14,8 +14,9 @@ pub(super) const MAX_FILES: usize = 100_000;
 /// The most bytes one search reads: 1 GiB.
 const MAX_BYTES: u64 = 1_073_741_824;
 
-/// How many files are considered between two pauses.
-const SLICE_FILES: usize = 32;
+/// How many files are considered and directories are listed between two
+/// pauses.
+const SLICE_ENTRIES: usize = 32;
 
 /// How many bytes are read between two pauses: 2 MiB.
 const SLICE_BYTES: u64 = 2_097_152;
@@ -33,8 +34,8 @@ pub(super) struct Limits {
     pub(super) max_bytes: u64,
     /// The largest file, by the size its listing gives, that is searched.
     pub(super) max_file_size: u64,
-    /// The files considered between two pauses.
-    pub(super) slice_files: usize,
+    /// The files considered and directories listed between two pauses.
+    pub(super) slice_entries: usize,
     /// The bytes read between two pauses.
     pub(super) slice_bytes: u64,
     /// The most bytes of body in the answer.
@@ -49,7 +50,7 @@ impl Default for Limits {
             max_files: MAX_FILES,
             max_bytes: MAX_BYTES,
             max_file_size: MAX_FILE_BYTES,
-            slice_files: SLICE_FILES,
+            slice_entries: SLICE_ENTRIES,
             slice_bytes: SLICE_BYTES,
             body_cap: BODY_CAP,
             window: Window::default(),

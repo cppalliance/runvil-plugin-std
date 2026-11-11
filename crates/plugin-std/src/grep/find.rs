@@ -3,8 +3,9 @@
 //!
 //! [`find`] is a pure function of its [`Source`]: it reads no clock, keeps
 //! nothing between calls, and returns what it found without writing any
-//! text. It ends its step now and then, so the Host can abandon a running
-//! search between two steps.
+//! text. It ends its step after every slice of entries or bytes its
+//! [`Limits`] name, so the Host can abandon a running search between two
+//! steps.
 
 use runvil_plugin_sdk::{DirEntry, FileError, FileErrorKind, FileType, next_step};
 
@@ -112,7 +113,7 @@ pub(super) async fn find<S: Source>(
         cost: 0,
         considered: 0,
         bytes: 0,
-        since_files: 0,
+        since_entries: 0,
         since_bytes: 0,
         finished: false,
     };
@@ -145,8 +146,9 @@ pub(super) struct Search<'a, 'r, S: Source> {
     considered: usize,
     /// How many bytes have been read.
     bytes: u64,
-    /// The files considered since the last pause.
-    since_files: usize,
+    /// The files considered and the directories listed since the last
+    /// pause.
+    since_entries: usize,
     /// The bytes read since the last pause.
     since_bytes: u64,
     /// Whether the search has everything it needs, or hit a limit.
@@ -234,19 +236,25 @@ impl<S: Source> Search<'_, '_, S> {
             }
             match entry.stat.file_type {
                 FileType::Symlink => self.skip(Reason::SymbolicLink, Some(&child.shown)),
-                FileType::Directory => match self.source.list(&child.access) {
-                    Ok(entries) => stack.push(Frame {
-                        dir: child,
-                        entries: sorted(entries).into_iter(),
-                    }),
-                    Err(error) => self.skip(directory_reason(&error), Some(&child.shown)),
-                },
-                // A pipe, a socket, or a device is never opened: reading one
-                // can block for good, so it is skipped as unreadable.
+                FileType::Directory => {
+                    match self.source.list(&child.access) {
+                        Ok(entries) => stack.push(Frame {
+                            dir: child,
+                            entries: sorted(entries).into_iter(),
+                        }),
+                        Err(error) => self.skip(directory_reason(&error), Some(&child.shown)),
+                    }
+                    // A listing is work too, so a tree of directories
+                    // with few files still ends its steps.
+                    self.since_entries += 1;
+                    self.pace().await;
+                }
                 FileType::File => {
                     self.visit(&child, &entry.name, entry.stat.size);
                     self.pace().await;
                 }
+                // A pipe, a socket, or a device is never opened: reading one
+                // can block for good, so it is skipped as unreadable.
                 _ => self.skip(Reason::UnreadableFile, Some(&child.shown)),
             }
         }
@@ -260,7 +268,7 @@ impl<S: Source> Search<'_, '_, S> {
             return;
         }
         self.considered += 1;
-        self.since_files += 1;
+        self.since_entries += 1;
         if let Some((_, matcher)) = &self.request.glob
             && !matcher.is_match(&node.shown)
         {
@@ -289,14 +297,14 @@ impl<S: Source> Search<'_, '_, S> {
         }
     }
 
-    /// Pauses when enough files or bytes have gone by since the last
+    /// Pauses when enough entries or bytes have gone by since the last
     /// pause: ends the step, so that no step works for long and a cancel
     /// or a stop can drop the future between two steps.
     async fn pace(&mut self) {
-        if self.since_files >= self.limits.slice_files
+        if self.since_entries >= self.limits.slice_entries
             || self.since_bytes >= self.limits.slice_bytes
         {
-            self.since_files = 0;
+            self.since_entries = 0;
             self.since_bytes = 0;
             next_step().await;
         }
