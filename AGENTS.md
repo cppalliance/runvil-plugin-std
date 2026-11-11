@@ -26,6 +26,9 @@ Anything else gets a qualified lowercase name, such as Rust's built-in test harn
 - Prefer types and compiler checks, then behavior tests. Gate on yes/no properties, never on a score threshold that ordinary work edits.
 - Behavior changes ship with tests in the same change. Preserve behavior tests during refactors.
 - The Plugin crate depends on `runvil-plugin-sdk` and outside libraries alone, and writes no `unsafe`. The SDK owns the C boundary.
+- A tool reads files only through `Source` (`crates/plugin-std/src/source.rs`), which the call's `ToolCall` implements, so every read goes through the Host and the run's policy applies to it. A test runs a tool's own code over the SDK's `testing::Files` tree, or over a `Source` it builds by hand for what that tree cannot hold.
+- A tool's description and parameter schema come from its JSON file under `crates/plugin-std/schemas`. `EDITS.md` beside them records every difference from Cursor's definition, and a change to a JSON file changes `EDITS.md` with it.
+- A tool that does a long job awaits `next_step()` every so often, so that no step of its call works for long and the Host can abandon the call between two steps.
 - A Plugin shares its process with the Host, so nothing here installs process-global state, such as a panic hook (`clippy.toml` bans `std::panic::set_hook`), and nothing starts a thread that outlives the Plugin's unload.
 - Comments explain a non-obvious constraint, ordering requirement, or workaround. A platform or external-bug workaround cites its upstream issue URL.
 
@@ -42,6 +45,6 @@ Anything else gets a qualified lowercase name, such as Rust's built-in test harn
 - A file holds one concept and has no length limit. Split a file only when it holds a second unrelated concept.
 - Size limits sit on functions and types. Clippy holds a function to 100 lines and 7 arguments (`clippy.toml`). `cargo test -p build-checks` holds a type to 25 inherent methods, summed across every `impl` block in its crate, and a struct to 12 named fields. Split an oversized type by responsibility; a new entry in the allowlist in `crates/build-checks/src/type_size.rs` is a design decision with a reason, never a way to make a change pass.
 - Production code uses the standard module layout: `foo.rs`, with `foo/bar.rs` for its children. No `#[path]`, and no inline `mod` blocks. A module never has exactly one child file (tests aside): merge it, or make it a peer module `foo_bar.rs` declared beside `foo.rs`.
-- Test code goes at the bottom of the file under test in a `#[cfg(test)] mod tests { }` block when practical, and otherwise in `foo-tests.rs` beside it, wired with `#[path = "foo-tests.rs"] mod tests;`, or in `foo/tests.rs` when `foo` has child modules. These are the only files wired with `#[path]`, so a hyphen in a file name means test code. A top-level `tests/` tree follows Cargo's conventions.
+- Test code goes at the bottom of the file under test in a `#[cfg(test)] mod tests { }` block when practical. Otherwise it goes beside that file, in `foo-tests.rs`, wired with `#[path = "foo-tests.rs"] mod tests;`, or in `foo/tests.rs`, with one file per topic under `foo/tests/` when the tests are many. A `foo-tests.rs` file is the only kind wired with `#[path]`, so a hyphen in a file name means test code. A top-level `tests/` tree follows Cargo's conventions.
 - The source code of each tool goes in its own module, named after the last segment of the tool's Lua id.
 - Pseudo-random test input comes only from a fixed seed that the failure prints.

@@ -10,6 +10,12 @@ license = "BSL-1.0"
 # The Plugin SDK at contract 0.4, pinned to the commit the Harness's loader
 # speaks. `version` beside `git` keeps cargo-deny's wildcard check quiet.
 runvil-plugin-sdk = { version = "0.4.0", git = "https://github.com/cppalliance/runvil-plugin-api", rev = "04574e32cf901437db40797aa4efcda90489b711" }
+# Each tool's definition is embedded JSON, and a call's arguments arrive
+# as JSON text.
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+# Grep compiles its pattern with Rust regex syntax.
+regex = "1"
 # Parses this workspace's sources for the type-size check; `full` is the
 # feature that parses items.
 syn = { version = "3", features = ["full"] }

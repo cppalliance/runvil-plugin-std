@@ -12,9 +12,19 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+# The Plugin contract's safe layer: the `Plugin` and `Pack` traits, what a
+# tool call is lent, and the entry point.
 runvil-plugin-sdk.workspace = true
+# Each tool's definition is embedded JSON, read into a spec when the Pack
+# is made, and a call's arguments arrive as JSON text.
+serde.workspace = true
+serde_json.workspace = true
+# Grep compiles its pattern with Rust regex syntax.
+regex.workspace = true
 
 [dev-dependencies]
+# `testing`, the fake Host, and its `Files` tree, which lends the tools a
+# run's files without a Harness.
 runvil-plugin-sdk = { workspace = true, features = ["test-support"] }
 
 [features]
