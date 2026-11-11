@@ -2,7 +2,7 @@
 
 The `std` Plugin for [runvil](https://github.com/cppalliance/runvil), built as a dynamic library that a Host loads from its Plugin directory. It speaks the C contract in [runvil-plugin-api](https://github.com/cppalliance/runvil-plugin-api) through `runvil-plugin-sdk`, and depends on nothing else from runvil.
 
-At contract 0.2 a library Plugin can only load, describe itself, and unload, so that is all this Plugin does. Its Pack, `runvil/std`, comes once the contract can insert one.
+The Plugin inserts one Pack, `runvil/std`. In this build the Pack offers one temporary tool, `std/hello`, which returns a fixed greeting and proves the path from a prompt to a library Plugin. The file tools replace it once the contract gives a tool call access to a run's files.
 
 ## Building
 
