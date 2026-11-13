@@ -27,7 +27,7 @@ cargo build -p plugin-std --release
 
 This writes `plugin_std.dll` (Windows), `libplugin_std.so` (Linux), or `libplugin_std.dylib` (macOS) to `target/release`. That one file goes in the Host's Plugin directory.
 
-A Host can also link the crate in. It turns the `dll` feature off, so the crate exports no symbol, and hands `runvil_plugin_sdk::entry::<plugin_std::Std>` to the Harness.
+A Host can also link the crate in. It turns the `dll` feature off, so the crate exports no symbol, and passes `runvil_plugin_sdk::entry::<plugin_std::Std>` to the Harness's `insert_plugin`.
 
 ## Working on this repository
 
