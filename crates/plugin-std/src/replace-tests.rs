@@ -201,13 +201,55 @@ fn the_text_put_in_is_not_searched_again() {
 }
 
 #[test]
-fn matches_are_counted_from_the_start_and_never_overlap() {
-    let files = Files::new().file("/a.txt", "aaa");
+fn replace_all_replaces_the_occurrences_that_do_not_overlap_from_the_start_of_the_file() {
+    let files = Files::new()
+        .file("/a.txt", "aaaaa")
+        .file("/b.txt", "banana");
     assert_eq!(
-        text_of(edit(&files, "/a.txt", "aa", "b")),
+        text_of(edit_all(&files, "/a.txt", "aa", "b")),
+        "Made 2 replacements."
+    );
+    assert_eq!(contents(&files, "/a.txt"), b"bba");
+    assert_eq!(
+        text_of(edit_all(&files, "/b.txt", "ana", "X")),
         "Made 1 replacement."
     );
-    assert_eq!(contents(&files, "/a.txt"), b"ba");
+    assert_eq!(contents(&files, "/b.txt"), b"bXna");
+}
+
+#[test]
+fn an_old_string_that_starts_at_two_places_that_overlap_is_refused_and_changes_nothing() {
+    let files = Files::new()
+        .file("/a.txt", "aaa")
+        .file("/b.txt", "banana")
+        .file("/c.txt", "\u{e9}\u{e9}\u{e9}");
+    let before = files.clone();
+    for (path, old) in [
+        ("/a.txt", "aa"),
+        ("/b.txt", "ana"),
+        ("/c.txt", "\u{e9}\u{e9}"),
+    ] {
+        assert_eq!(
+            failure_of(edit(&files, path, old, "X")),
+            format!(
+                "`old_string` starts at more than one place in {path}, in occurrences that \
+                 overlap, and it must occur exactly once. Add text around it until it names one \
+                 occurrence."
+            ),
+            "{old:?}"
+        );
+    }
+    assert_eq!(files, before);
+}
+
+#[test]
+fn more_text_around_an_old_string_that_overlaps_itself_names_one_occurrence() {
+    let files = Files::new().file("/b.txt", "banana");
+    assert_eq!(
+        text_of(edit(&files, "/b.txt", "bana", "X")),
+        "Made 1 replacement."
+    );
+    assert_eq!(contents(&files, "/b.txt"), b"Xna");
 }
 
 #[test]

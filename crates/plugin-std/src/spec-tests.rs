@@ -202,6 +202,8 @@ fn the_replace_description_holds_both_byte_limits_and_states_what_the_tool_does(
         "line endings",
         "how many times it occurs",
         "replaces every occurrence and needs at least one",
+        "a call without replace_all fails",
+        "replaces the ones that do not overlap, from the start of the file",
         "UTF-8",
         "one after another",
     ] {

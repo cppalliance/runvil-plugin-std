@@ -6,9 +6,12 @@
 //! must hold UTF-8. Nothing is decoded, and nothing outside the matches
 //! changes, so a byte order mark and the line endings stay as they are.
 //! The text to replace must occur exactly once, unless `replace_all` is
-//! set, and a failure states how many times it occurs. An edit that would
-//! leave the file longer than one write takes is refused from the count
-//! of matches, before the edited text is built.
+//! set, and a failure states how many times it occurs. A text that starts
+//! at more than one place does not occur once, even where the places
+//! overlap, and with `replace_all` the occurrences that do not overlap are
+//! replaced, from the start of the file. An edit that would leave the file
+//! longer than one write takes is refused from the count of matches,
+//! before the edited text is built.
 //!
 //! The edit is a read and then a write, each a request to the Host of its
 //! own. A change that another task makes to the file between the two is
@@ -67,6 +70,11 @@ pub(crate) async fn call(
     let count = text.matches(request.old).count();
     if count == 0 || (count > 1 && !request.all) {
         return Err(message(miscount(path, count, request.all)));
+    }
+    // The count leaves out an occurrence that overlaps the one before
+    // it, so a text that is counted once can start at a second place.
+    if !request.all && starts_twice(&text, request.old) {
+        return Err(message(overlap(path)));
     }
     // The length of the edited text follows from the count, so an edit
     // that is too long is refused before any of it is built. A call with
@@ -129,6 +137,18 @@ fn parse<'a>(definition: &Definition, args: &'a Value) -> Result<Request<'a>, To
     })
 }
 
+/// Whether `old` starts at more than one place in `text`. A second place
+/// can lie inside the first occurrence, as `ana` starts at two places in
+/// `banana`, and [`str::matches`] counts such a text once.
+fn starts_twice(text: &str, old: &str) -> bool {
+    // The second search begins one character past the first place, so it
+    // also finds a place inside the first occurrence.
+    let step = old.chars().next().map_or(1, char::len_utf8);
+    text.find(old)
+        .and_then(|first| text.get(first + step..))
+        .is_some_and(|rest| rest.contains(old))
+}
+
 /// The length in bytes of a text of `len` bytes once each of its `count`
 /// matches, of `old` bytes, has given way to `new` bytes. The matches do
 /// not overlap, so together they take up no more than `len` bytes. A
@@ -156,6 +176,16 @@ fn miscount(path: &str, count: usize, all: bool) -> String {
              occurrence, or set `replace_all` to replace every one."
         )
     }
+}
+
+/// The sentence for a text to replace that starts at more than one place
+/// in the file at `path`, in occurrences that overlap, where the call
+/// needs it once.
+fn overlap(path: &str) -> String {
+    format!(
+        "`old_string` starts at more than one place in {path}, in occurrences that overlap, \
+         and it must occur exactly once. Add text around it until it names one occurrence."
+    )
 }
 
 #[cfg(test)]

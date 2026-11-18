@@ -240,6 +240,33 @@ fn an_edit_whose_text_does_not_occur_once_fails_with_the_count_before_any_write(
 }
 
 #[test]
+fn an_edit_whose_text_overlaps_itself_fails_before_any_write_unless_it_replaces_all() {
+    let before = Files::new().file("/b.txt", "banana");
+    let args = json!({ "path": "/b.txt", "old_string": "ana", "new_string": "X" });
+    let (result, after) = change(before.clone(), "replace", &args);
+    let error = result.expect_err("the text starts at two places");
+    assert_eq!(
+        error.message(),
+        "`old_string` starts at more than one place in /b.txt, in occurrences that overlap, and \
+         it must occur exactly once. Add text around it until it names one occurrence."
+    );
+    assert_eq!(error.kind(), ToolErrorKind::Other);
+    assert_eq!(after, before);
+    assert_eq!(
+        steps(before.clone(), "replace", &args),
+        3,
+        "the stat and the read"
+    );
+    let all = json!({
+        "path": "/b.txt", "old_string": "ana", "new_string": "X", "replace_all": true
+    });
+    let (result, after) = change(before, "replace", &all);
+    let output = result.expect("the occurrence that starts first is replaced");
+    assert_eq!(output.text(), "Made 1 replacement.");
+    assert_eq!(contents(&after, "/b.txt"), Ok(b"bXna".to_vec()));
+}
+
+#[test]
 fn an_edit_the_policy_denies_fails_with_the_policys_own_reason_and_changes_nothing() {
     let reason = "Mode::Ask allows no read of /vault.md";
     let before = Files::new()
