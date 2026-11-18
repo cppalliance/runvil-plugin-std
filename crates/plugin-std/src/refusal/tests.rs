@@ -3,7 +3,10 @@
 
 use runvil_plugin_sdk::{FileError, FileErrorKind};
 
-use super::{missing_root, neither_file_nor_directory, not_a_directory, refusal, write_refusal};
+use super::{
+    is_a_directory, missing_root, neither_file_nor_directory, not_a_directory, refusal,
+    write_refusal,
+};
 
 /// The path the model wrote, and the resolved path every error text
 /// below names, which differs so a test can tell which one a sentence
@@ -187,6 +190,18 @@ fn a_missing_root_is_worded_apart_from_a_missing_file() {
         "File not found: notes/a.md"
     );
     assert_eq!(missing_root(WRITTEN), "Path does not exist: notes/a.md");
+}
+
+#[test]
+fn the_is_a_directory_sentence_is_the_one_the_refusal_gives() {
+    assert_eq!(
+        say(&error(FileErrorKind::IsADirectory)),
+        is_a_directory(WRITTEN)
+    );
+    assert_eq!(
+        is_a_directory("/a/b"),
+        "Path is a directory, not a file: /a/b"
+    );
 }
 
 #[test]

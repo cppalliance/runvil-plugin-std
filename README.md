@@ -11,13 +11,13 @@ The Plugin inserts one Pack, `runvil/std`, which gives a run the standard file t
 | `std/grep` | `Grep` | Searches the files under a path with a Rust regular expression |
 | `std/write` | `Write` | Creates a file, or replaces the whole contents of one |
 | `std/replace` | `StrReplace` | Replaces a text that occurs once in a file, or every occurrence of it |
-| `std/rm` | `Delete` | A stub: answers that the tool is not implemented |
-| `std/glob` | `Glob` | A stub |
+| `std/rm` | `Delete` | Deletes a file or a link, and refuses a directory |
+| `std/glob` | `Glob` | A stub: answers that the tool is not implemented |
 
 - Each tool's wire name, description, and parameter schema is a JSON file under `crates/plugin-std/schemas`, and `EDITS.md` beside them lists how each differs from Cursor's definition.
 - Every file operation of a tool goes through the Host, so the run's policy applies to each one. An operation the policy denies fails the call with the policy's own reason. The one exception is an entry below the path a Grep call names, which Grep skips and counts.
-- File text and file names come back as untrusted output. The Host marks them before a model reads them. The answer to a change is fixed text and a count, which is trusted output.
-- Write and StrReplace say to the Host that they change files. The Host runs a call of such a tool by itself among the calls of one model reply, so two changes of one reply happen in the order the reply lists them.
+- File text and file names come back as untrusted output. The Host marks them before a model reads them. The answer to a change holds fixed text and at most a count, so it is trusted output.
+- Write, StrReplace, and Delete say to the Host that they change files. The Host runs a call of such a tool by itself among the calls of one model reply, so two changes of one reply happen in the order the reply lists them.
 - StrReplace edits a file with a read and then a write, so a change that another task makes to the file between the two is lost.
 - A tool call ends its step at each file operation, and the Host performs the operation before the next step. A search also ends its step every 32 files or directories, so the Host can cancel a call between two steps.
 

@@ -31,6 +31,10 @@ pub(crate) trait Source {
     /// file is made when it is absent, with each directory on the way to
     /// it.
     async fn write(&self, path: &str, bytes: Vec<u8>) -> Result<(), FileError>;
+
+    /// Removes what is at `path`: a file, a link, or a directory with no
+    /// entries. A link goes as a link, and what it leads to stays.
+    async fn remove(&self, path: &str) -> Result<(), FileError>;
 }
 
 impl Source for ToolCall<'_> {
@@ -52,6 +56,10 @@ impl Source for ToolCall<'_> {
 
     async fn write(&self, path: &str, bytes: Vec<u8>) -> Result<(), FileError> {
         ToolCall::write(self, path, bytes).await
+    }
+
+    async fn remove(&self, path: &str) -> Result<(), FileError> {
+        ToolCall::remove(self, path, false).await
     }
 }
 
@@ -79,5 +87,9 @@ impl Source for runvil_plugin_sdk::testing::Files {
 
     async fn write(&self, path: &str, bytes: Vec<u8>) -> Result<(), FileError> {
         runvil_plugin_sdk::testing::Files::write(self, path, bytes)
+    }
+
+    async fn remove(&self, path: &str) -> Result<(), FileError> {
+        runvil_plugin_sdk::testing::Files::remove(self, path, false)
     }
 }

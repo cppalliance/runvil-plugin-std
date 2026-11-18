@@ -26,7 +26,9 @@ Each file in this directory except `dir.json` is Cursor's definition of the tool
 
 ## rm.json
 
-- Verbatim. Cursor's `Delete` description and schema are kept exactly.
+- Cursor's `Delete` description and schema, with two additions to the description.
+- `The path is a directory` joined the list of failures, because Delete removes a file and refuses a directory.
+- Added a `Usage` list that states that a link is deleted as a link, so what it leads to stays, and that the calls in one response that change files run one after another in the order listed.
 
 ## glob.json
 

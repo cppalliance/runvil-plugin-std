@@ -19,7 +19,7 @@ use runvil_plugin_sdk::{FileError, FileErrorKind};
 pub(crate) fn refusal(tool: &str, path: &str, error: &FileError) -> String {
     match error.kind() {
         FileErrorKind::NotFound => format!("File not found: {path}"),
-        FileErrorKind::IsADirectory => format!("Path is a directory, not a file: {path}"),
+        FileErrorKind::IsADirectory => is_a_directory(path),
         FileErrorKind::NotADirectory => not_a_directory(path),
         FileErrorKind::Conflict => format!(
             "{path} was changed, or is being changed, by another call in this round, so it \
@@ -52,6 +52,12 @@ pub(crate) fn write_refusal(tool: &str, path: &str, error: &FileError) -> String
 /// the `NotFound` sentence above says a file was not found.
 pub(crate) fn missing_root(path: &str) -> String {
     format!("Path does not exist: {path}")
+}
+
+/// The sentence for a path that names a directory where a file was
+/// needed.
+pub(crate) fn is_a_directory(path: &str) -> String {
+    format!("Path is a directory, not a file: {path}")
 }
 
 /// The sentence for a path that names something other than a directory

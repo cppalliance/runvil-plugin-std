@@ -147,8 +147,12 @@ fn a_call_goes_to_the_tool_its_name_picks() {
     .expect("the file is edited");
     assert_eq!(replace.text(), "Made 1 replacement.");
     assert_eq!(files.read("/p/c.md", 0, u64::MAX), Ok(b"y".to_vec()));
-    let stub = ran("rm", r#"{"path":"/p/c.md"}"#, &files).expect("a stub answers its text");
-    assert_eq!(stub.text(), NOT_IMPLEMENTED.replace("<name>", "Delete"));
+    let rm = ran("rm", r#"{"path":"/p/c.md"}"#, &files).expect("the file is deleted");
+    assert_eq!(rm.text(), "Deleted the file.");
+    assert!(files.stat("/p/c.md").is_err());
+    let stub =
+        ran("glob", r#"{"glob_pattern":"*.md"}"#, &files).expect("the stub answers its text");
+    assert_eq!(stub.text(), NOT_IMPLEMENTED.replace("<name>", "Glob"));
     assert!(stub.is_trusted());
 }
 
@@ -161,5 +165,5 @@ fn an_instance_flags_the_tools_that_change_files_and_no_other() {
         .filter(|tool| tool.changes_files)
         .map(|tool| tool.name.as_str())
         .collect();
-    assert_eq!(flagged, ["write", "replace"]);
+    assert_eq!(flagged, ["write", "replace", "rm"]);
 }

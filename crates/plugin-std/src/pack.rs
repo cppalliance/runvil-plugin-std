@@ -1,6 +1,6 @@
 //! The `std` Pack: its [`INFO`], [`StdPack`], one run's instance, which
 //! lists the Pack's tools and hands each call to its tool's module, and
-//! the stub that Delete and Glob still answer with in this build.
+//! the stub that Glob still answers with in this build.
 
 use std::sync::Arc;
 
@@ -14,8 +14,8 @@ use crate::source::Source;
 use crate::spec::Definition;
 
 /// What a call to a tool that is still a stub answers in this build, when
-/// its arguments match the schema. Delete and Glob are the stubs, and
-/// every other tool is real and never answers this.
+/// its arguments match the schema. Glob is the one stub, and every other
+/// tool is real and never answers this.
 ///
 /// The text says the implementation is missing rather than that the call
 /// was wrong, because a model that reads it should stop calling the tool.
@@ -71,7 +71,7 @@ impl StdPack {
 /// calls of one model reply, after the calls the reply lists before it,
 /// so two changes of one reply happen in the order the reply lists them.
 fn changes_files(segment: &str) -> bool {
-    matches!(segment, "write" | "replace")
+    matches!(segment, "write" | "replace" | "rm")
 }
 
 /// The stub text for the tool the model calls `wire_name`.
@@ -113,6 +113,7 @@ async fn run(
         "grep" => crate::grep::call(source, definition, &args).await,
         "write" => crate::write::call(source, definition, &args).await,
         "replace" => crate::replace::call(source, definition, &args).await,
+        "rm" => crate::rm::call(source, definition, &args).await,
         _ => Ok(ToolOutput::trusted(stub(&definition.wire_name))),
     }
 }

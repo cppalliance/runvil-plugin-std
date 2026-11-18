@@ -93,6 +93,10 @@ where
     async fn write(&self, path: &str, _bytes: Vec<u8>) -> Result<(), FileError> {
         panic!("the walk wrote {path}")
     }
+
+    async fn remove(&self, path: &str) -> Result<(), FileError> {
+        panic!("the walk removed {path}")
+    }
 }
 
 /// Walks `target` over the listings `list` answers with, leaving out

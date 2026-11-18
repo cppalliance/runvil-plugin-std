@@ -17,7 +17,7 @@ use runvil_plugin_sdk::{FileError, FileType, ToolError, ToolErrorKind, ToolOutpu
 use serde_json::Value;
 
 use crate::check::plural;
-use crate::refusal::{neither_file_nor_directory, refusal};
+use crate::refusal::{is_a_directory, neither_file_nor_directory, refusal};
 use crate::source::Source;
 use crate::spec::Definition;
 use crate::text::{MAX_FILE_BYTES, decode, sniff_binary, split_lines};
@@ -113,7 +113,7 @@ pub(crate) async fn load(source: &impl Source, tool: &str, path: &str) -> Result
 fn check_type(path: &str, file_type: FileType) -> Result<(), String> {
     match file_type {
         FileType::File | FileType::Symlink => Ok(()),
-        FileType::Directory => Err(format!("Path is a directory, not a file: {path}")),
+        FileType::Directory => Err(is_a_directory(path)),
         // A pipe, a socket, or a device, and any kind added later: none
         // of them holds text, and a read of one can block for good.
         _ => Err(neither_file_nor_directory(path)),

@@ -202,6 +202,26 @@ fn the_replace_description_holds_the_file_ceiling_and_states_what_the_tool_does(
 }
 
 #[test]
+fn the_rm_description_says_that_a_directory_fails_and_that_a_link_goes_as_a_link() {
+    let definitions = all();
+    let rm = definitions
+        .iter()
+        .find(|definition| definition.segment == "rm")
+        .expect("the rm definition exists");
+    let text = &rm.description;
+    for phrase in [
+        "The path is a directory",
+        "A link is deleted as a link",
+        "one after another",
+    ] {
+        assert!(
+            text.contains(phrase),
+            "the description names {phrase}: {text}"
+        );
+    }
+}
+
+#[test]
 fn the_dir_description_holds_the_body_cap_and_no_unfilled_placeholder() {
     let definitions = all();
     let dir = definitions

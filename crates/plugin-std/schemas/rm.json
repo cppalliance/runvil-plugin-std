@@ -1,6 +1,6 @@
 {
   "wire_name": "Delete",
-  "description": "Deletes a file at the specified path. The operation will fail gracefully if:\n    - The file doesn't exist\n    - The operation is rejected for security reasons\n    - The file cannot be deleted",
+  "description": "Deletes a file at the specified path. The operation will fail gracefully if:\n    - The file doesn't exist\n    - The path is a directory\n    - The operation is rejected for security reasons\n    - The file cannot be deleted\n\nUsage:\n- A link is deleted as a link, and what it leads to stays.\n- The calls in one response that change files run one after another, in the order you list them.",
   "parameters": {
     "type": "object",
     "properties": {

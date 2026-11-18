@@ -59,7 +59,7 @@ fn the_tools_that_change_files_say_so_to_the_host_and_no_other_tool_does() {
         .filter(|tool| tool.changes_files)
         .map(|tool| tool.name.as_str())
         .collect();
-    assert_eq!(flagged, ["write", "replace"]);
+    assert_eq!(flagged, ["write", "replace", "rm"]);
 }
 
 #[test]
@@ -235,4 +235,97 @@ fn two_edits_of_one_file_in_a_run_both_apply() {
         assert!(edited.is_ok(), "{old}");
     }
     assert_eq!(contents(pack.files(), "/a.md"), Ok(b"1 two 3\n".to_vec()));
+}
+
+#[test]
+fn delete_removes_a_file_and_answers_fixed_text_as_trusted_output() {
+    let (result, files) = change(
+        Files::new()
+            .file("/notes/a.md", "one")
+            .file("/notes/b.md", "two"),
+        "rm",
+        &json!({ "path": "/notes/a.md" }),
+    );
+    let output = result.expect("the file is deleted");
+    assert_eq!(output.text(), "Deleted the file.");
+    assert!(output.is_trusted());
+    assert_eq!(files, Files::new().file("/notes/b.md", "two"));
+}
+
+#[test]
+fn delete_asks_the_host_for_a_stat_and_then_a_removal() {
+    let files = Files::new().file("/a.md", "one");
+    assert_eq!(steps(files, "rm", &json!({ "path": "/a.md" })), 3);
+}
+
+#[test]
+fn delete_refuses_a_directory_after_its_stat_and_removes_nothing() {
+    let before = Files::new().file("/notes/a.md", "one").dir("/empty");
+    for directory in ["/notes", "/empty"] {
+        let args = json!({ "path": directory });
+        let (result, after) = change(before.clone(), "rm", &args);
+        let error = result.expect_err("the path names a directory");
+        assert_eq!(
+            error.message(),
+            format!("Path is a directory, not a file: {directory}")
+        );
+        assert_eq!(error.kind(), ToolErrorKind::Other);
+        assert_eq!(after, before);
+        assert_eq!(steps(before.clone(), "rm", &args), 2, "the stat alone");
+    }
+}
+
+#[test]
+fn delete_of_a_missing_path_fails_with_the_not_found_text() {
+    let args = json!({ "path": "/nope.md" });
+    let (result, files) = change(Files::new(), "rm", &args);
+    let error = result.expect_err("nothing is at the path");
+    assert_eq!(error.message(), "File not found: /nope.md");
+    assert_eq!(files, Files::new());
+    assert_eq!(steps(Files::new(), "rm", &args), 2, "the stat alone");
+}
+
+#[test]
+fn a_delete_the_policy_denies_fails_with_the_policys_own_reason_and_changes_nothing() {
+    let reason = "Mode::Ask allows no change of /vault.md";
+    let before = Files::new()
+        .file("/a.md", "kept")
+        .fails("/vault.md", FileError::new(FileErrorKind::Denied, reason));
+    let (result, after) = change(before.clone(), "rm", &json!({ "path": "/vault.md" }));
+    let error = result.expect_err("the policy denies the delete");
+    assert_eq!(error.message(), reason);
+    assert_eq!(after, before);
+}
+
+#[test]
+fn the_calls_of_one_run_write_edit_read_and_delete_one_file_in_turn() {
+    let loaded = testing::load::<Std>().expect("the Plugin loads");
+    let pack = loaded.new_pack(PACK).expect("the Pack instance is made");
+    let call = |name: &str, args: Value| {
+        pack.call(name, &args.to_string())
+            .expect("the call follows the contract")
+    };
+    let answer = |name: &str, args: Value| {
+        let output = call(name, args).unwrap_or_else(|error| panic!("{name} fails: {error}"));
+        output.text().to_owned()
+    };
+    let path = "/notes/a.md";
+    assert_eq!(
+        answer("write", json!({ "path": path, "contents": "one\ntwo\n" })),
+        "Wrote 8 bytes."
+    );
+    assert_eq!(
+        answer(
+            "replace",
+            json!({ "path": path, "old_string": "two", "new_string": "2" })
+        ),
+        "Made 1 replacement."
+    );
+    assert_eq!(
+        answer("read", json!({ "path": path })),
+        "     1|one\n     2|2\n"
+    );
+    assert_eq!(answer("rm", json!({ "path": path })), "Deleted the file.");
+    let gone = call("read", json!({ "path": path })).expect_err("the file is gone");
+    assert_eq!(gone.message(), "File not found: /notes/a.md");
 }

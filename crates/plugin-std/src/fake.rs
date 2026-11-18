@@ -189,4 +189,8 @@ impl Source for FakeSource {
     async fn write(&self, path: &str, _bytes: Vec<u8>) -> Result<(), FileError> {
         Err(self.refused(path))
     }
+
+    async fn remove(&self, path: &str) -> Result<(), FileError> {
+        Err(self.refused(path))
+    }
 }

@@ -71,16 +71,11 @@ fn each_run_gets_an_instance_of_its_own_with_the_same_tools() {
 }
 
 #[test]
-fn every_stub_answers_the_not_implemented_text_naming_itself() {
-    for (name, wire_name, args) in [
-        ("rm", "Delete", json!({ "path": "/notes.md" })),
-        ("glob", "Glob", json!({ "glob_pattern": "**/*.md" })),
-    ] {
-        let output = call(name, &args).expect("a matching call succeeds");
-        let expected = NOT_IMPLEMENTED.replace("<name>", wire_name);
-        assert_eq!(output.text(), expected, "{name}");
-        assert!(output.is_trusted(), "{name}");
-    }
+fn glob_the_one_stub_answers_the_not_implemented_text_naming_itself() {
+    let output =
+        call("glob", &json!({ "glob_pattern": "**/*.md" })).expect("a matching call succeeds");
+    assert_eq!(output.text(), NOT_IMPLEMENTED.replace("<name>", "Glob"));
+    assert!(output.is_trusted());
 }
 
 #[test]
@@ -259,7 +254,7 @@ fn grep_of_a_missing_path_fails_with_the_does_not_exist_text() {
 }
 
 #[test]
-fn grep_refuses_an_undeclared_key_by_name_while_the_stubs_let_it_through() {
+fn grep_refuses_an_undeclared_key_by_name_while_the_stub_lets_it_through() {
     let error = call("grep", &json!({ "pattern": "x", "context": 3 }))
         .expect_err("context is not a parameter");
     assert_eq!(error.kind(), ToolErrorKind::InvalidArguments);
