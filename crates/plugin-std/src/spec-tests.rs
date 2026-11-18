@@ -162,16 +162,21 @@ fn the_write_description_holds_the_limit_of_one_write_and_states_what_the_tool_d
         "exactly as given",
         "names a directory fails",
         "one after another",
+        "so that you know what the write replaces",
     ] {
         assert!(
             text.contains(phrase),
             "the description names {phrase}: {text}"
         );
     }
+    assert!(
+        !text.contains("never overwritten"),
+        "a read before a write protects no change that comes after it: {text}"
+    );
 }
 
 #[test]
-fn the_replace_description_holds_the_file_ceiling_and_states_what_the_tool_does() {
+fn the_replace_description_holds_both_byte_limits_and_states_what_the_tool_does() {
     let definitions = all();
     let replace = definitions
         .iter()
@@ -179,18 +184,24 @@ fn the_replace_description_holds_the_file_ceiling_and_states_what_the_tool_does(
         .expect("the replace definition exists");
     let text = &replace.description;
     assert!(
-        text.contains("over 16777216 bytes"),
+        text.contains("A file over 16777216 bytes is refused"),
         "the file ceiling is named: {text}"
     );
     assert!(
-        !text.contains("{file_ceiling}"),
-        "{{file_ceiling}} is filled in: {text}"
+        text.contains("with more than 16777216 bytes"),
+        "the limit of one write is named for the edited file: {text}"
     );
+    for placeholder in ["{file_ceiling}", "{write_limit}"] {
+        assert!(
+            !text.contains(placeholder),
+            "{placeholder} is filled in: {text}"
+        );
+    }
     for phrase in [
         "matched exactly",
         "line endings",
         "how many times it occurs",
-        "replaces every occurrence",
+        "replaces every occurrence and needs at least one",
         "UTF-8",
         "one after another",
     ] {

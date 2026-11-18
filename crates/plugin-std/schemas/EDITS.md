@@ -17,12 +17,13 @@ Each file in this directory except `dir.json` is Cursor's definition of the tool
 ## write.json
 
 - Cursor's `Write` description, which is about creating or overwriting a file. Reworded to name `StrReplace` for targeted changes and to require a read before overwriting, matching Cursor's own guidance. The parameters, their types, and the `required` list are Cursor's.
+- The reason the text gives for that read is that the model then knows what the write replaces. The text does not say that the read protects a change, because a write also replaces a change that another task made after the read.
 - Added a `Usage` list that states what Write does: the directories on the way to the file are created, `contents` is written exactly as given and holds at most `{write_limit}` bytes, a path that names a directory fails, and the calls in one response that change files run one after another in the order listed. The placeholder is filled when the definition is built, from the SDK's limit on one write, which the code enforces, so the text and the limit cannot drift apart.
 
 ## replace.json
 
 - Cursor's `StrReplace` definition. The wording is ours; the parameters, their types, and the `required` list are Cursor's.
-- Added a `Usage` list that states what StrReplace does: `old_string` is matched exactly, and the line number and the pipe that Read shows are not part of the file; a call fails with the count when `old_string` does not occur exactly once, and with `replace_all` it fails only when there is no occurrence; only UTF-8 text is edited, and a file over `{file_ceiling}` bytes is refused; and the calls in one response that change files run one after another in the order listed. The placeholder is filled when the definition is built, from the constant the code enforces, so the text and the limit cannot drift apart.
+- Added a `Usage` list that states what StrReplace does: `old_string` is matched exactly, and the line number and the pipe that Read shows are not part of the file; a call fails with the count when `old_string` does not occur exactly once, and with `replace_all` the call needs at least one occurrence; only UTF-8 text is edited, a file over `{file_ceiling}` bytes is refused, and so is an edit that would leave the file with more than `{write_limit}` bytes; and the calls in one response that change files run one after another in the order listed. The two placeholders are filled when the definition is built, from the constants the code enforces, so the text and the limits cannot drift apart.
 
 ## rm.json
 

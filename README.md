@@ -27,7 +27,7 @@ The Plugin inserts one Pack, `runvil/std`, which gives a run the standard file t
 cargo build -p plugin-std --release
 ```
 
-This writes `plugin_std.dll` (Windows), `libplugin_std.so` (Linux), or `libplugin_std.dylib` (macOS) to `target/release`. That one file goes in the Host's Plugin directory.
+This writes `plugin_std.dll` (Windows), `libplugin_std.so` (Linux), or `libplugin_std.dylib` (macOS) to `target/release`. That one file goes in the Host's Plugin directory. The Plugin speaks contract 0.5, the version that the pin of `runvil-plugin-sdk` in `Cargo.toml` names, and a Host loads it only when its Harness speaks the same version.
 
 A Host can also link the crate in. It turns the `dll` feature off, so the crate exports no symbol, and passes `runvil_plugin_sdk::entry::<plugin_std::Std>` to the Harness's `insert_plugin`.
 

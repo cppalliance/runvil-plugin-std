@@ -94,9 +94,12 @@ fn fill(segment: &str, description: &str) -> String {
             "{write_limit}",
             &runvil_plugin_sdk::sys::RV_MAX_WRITE.to_string(),
         ),
-        "replace" => {
-            description.replace("{file_ceiling}", &crate::text::MAX_FILE_BYTES.to_string())
-        }
+        "replace" => description
+            .replace("{file_ceiling}", &crate::text::MAX_FILE_BYTES.to_string())
+            .replace(
+                "{write_limit}",
+                &runvil_plugin_sdk::sys::RV_MAX_WRITE.to_string(),
+            ),
         "dir" => description.replace("{body_cap}", &crate::text::BODY_CAP.to_string()),
         "grep" => description
             .replace("{body_cap}", &crate::text::BODY_CAP.to_string())
