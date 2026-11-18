@@ -142,6 +142,35 @@ fn the_read_description_holds_the_limits_the_code_uses_and_no_unfilled_placehold
 }
 
 #[test]
+fn the_write_description_holds_the_limit_of_one_write_and_states_what_the_tool_does() {
+    let definitions = all();
+    let write = definitions
+        .iter()
+        .find(|definition| definition.segment == "write")
+        .expect("the write definition exists");
+    let text = &write.description;
+    assert!(
+        text.contains("at most 16777216 bytes"),
+        "the limit of one write is named: {text}"
+    );
+    assert!(
+        !text.contains("{write_limit}"),
+        "{{write_limit}} is filled in: {text}"
+    );
+    for phrase in [
+        "directories on the way",
+        "exactly as given",
+        "names a directory fails",
+        "one after another",
+    ] {
+        assert!(
+            text.contains(phrase),
+            "the description names {phrase}: {text}"
+        );
+    }
+}
+
+#[test]
 fn the_dir_description_holds_the_body_cap_and_no_unfilled_placeholder() {
     let definitions = all();
     let dir = definitions

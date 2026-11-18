@@ -9,14 +9,15 @@ The Plugin inserts one Pack, `runvil/std`, which gives a run the standard file t
 | `std/read` | `Read` | Returns a window of a text file's lines, each with its line number |
 | `std/dir` | `ListDir` | Returns a bullet tree of a directory, listed breadth first |
 | `std/grep` | `Grep` | Searches the files under a path with a Rust regular expression |
-| `std/write` | `Write` | A stub: answers that the tool is not implemented |
-| `std/replace` | `StrReplace` | A stub |
+| `std/write` | `Write` | Creates a file, or replaces the whole contents of one |
+| `std/replace` | `StrReplace` | A stub: answers that the tool is not implemented |
 | `std/rm` | `Delete` | A stub |
 | `std/glob` | `Glob` | A stub |
 
 - Each tool's wire name, description, and parameter schema is a JSON file under `crates/plugin-std/schemas`, and `EDITS.md` beside them lists how each differs from Cursor's definition.
-- Every file a tool reads goes through the Host, so the run's policy applies to each read. A read the policy denies fails the call with the policy's own reason. The one exception is an entry below the path a Grep call names, which Grep skips and counts.
-- File text and file names come back as untrusted output. The Host marks them before a model reads them.
+- Every file operation of a tool goes through the Host, so the run's policy applies to each one. An operation the policy denies fails the call with the policy's own reason. The one exception is an entry below the path a Grep call names, which Grep skips and counts.
+- File text and file names come back as untrusted output. The Host marks them before a model reads them. The answer to a change is fixed text and a count, which is trusted output.
+- Write says to the Host that it changes files. The Host runs a call of such a tool by itself among the calls of one model reply, so two changes of one reply happen in the order the reply lists them.
 - A tool call ends its step at each file operation, and the Host performs the operation before the next step. A search also ends its step every 32 files or directories, so the Host can cancel a call between two steps.
 
 ## Building

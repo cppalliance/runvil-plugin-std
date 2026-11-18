@@ -12,10 +12,10 @@ use runvil_plugin_sdk::{FileError, FileErrorKind};
 /// The model-readable sentence for `error`, from the tool called `tool`
 /// (the name the model uses) on `path` (as the model wrote it).
 ///
-/// A sentence names no tool other than `tool`. A read the run's policy
-/// denies, and a failure the contract has no kind for, read as the Host's
-/// own words alone. An I/O failure reads as the path and then the Host's
-/// words.
+/// A sentence names no tool other than `tool`. An operation the run's
+/// policy denies, and a failure of a kind that has no sentence here, read
+/// as the Host's own words alone. An I/O failure reads as the path and
+/// then the Host's words.
 pub(crate) fn refusal(tool: &str, path: &str, error: &FileError) -> String {
     match error.kind() {
         FileErrorKind::NotFound => format!("File not found: {path}"),
@@ -27,6 +27,22 @@ pub(crate) fn refusal(tool: &str, path: &str, error: &FileError) -> String {
         ),
         FileErrorKind::Io => format!("I/O failure on {path}: {}", error.text()),
         _ => error.text().to_owned(),
+    }
+}
+
+/// The model-readable sentence for `error`, from a write that the tool
+/// called `tool` made to `path` (as the model wrote it).
+///
+/// A write needs a directory only on the way to its file, so a failure
+/// for something that is not a directory is about a parent of `path`,
+/// where [`refusal`] would say that `path` itself is not a directory.
+/// Every other failure reads as [`refusal`] words it.
+pub(crate) fn write_refusal(tool: &str, path: &str, error: &FileError) -> String {
+    match error.kind() {
+        FileErrorKind::NotADirectory => {
+            format!("Path has a parent that is not a directory: {path}")
+        }
+        _ => refusal(tool, path, error),
     }
 }
 

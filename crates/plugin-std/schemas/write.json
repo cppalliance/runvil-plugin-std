@@ -1,6 +1,6 @@
 {
   "wire_name": "Write",
-  "description": "Creates or overwrites a file at the specified path. Use this tool to create a new file or to replace the whole contents of an existing one. If the destination file already exists, you MUST first read it before writing, so a change you did not make is never overwritten. For a targeted change to an existing file, prefer StrReplace.",
+  "description": "Creates or overwrites a file at the specified path. Use this tool to create a new file or to replace the whole contents of an existing one. If the destination file already exists, you MUST first read it before writing, so a change you did not make is never overwritten. For a targeted change to an existing file, prefer StrReplace.\n\nUsage:\n- The directories on the way to the file are created when they do not exist.\n- contents is written exactly as given, as the whole file. It holds at most {write_limit} bytes.\n- A path that names a directory fails.\n- The calls in one response that change files run one after another, in the order you list them.",
   "parameters": {
     "type": "object",
     "properties": {

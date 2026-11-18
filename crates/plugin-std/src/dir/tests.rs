@@ -89,6 +89,10 @@ where
     async fn read_prefix(&self, path: &str, _len: u64) -> Result<Vec<u8>, FileError> {
         panic!("the walk read {path}")
     }
+
+    async fn write(&self, path: &str, _bytes: Vec<u8>) -> Result<(), FileError> {
+        panic!("the walk wrote {path}")
+    }
 }
 
 /// Walks `target` over the listings `list` answers with, leaving out

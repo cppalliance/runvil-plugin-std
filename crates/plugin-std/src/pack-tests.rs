@@ -1,5 +1,6 @@
 //! Unit tests for the `std` Pack's stub text, the definitions it builds
-//! from, the arguments it parses, and the tool a call's name picks.
+//! from, the arguments it parses, the tool a call's name picks, and the
+//! tools it says change files.
 
 use std::sync::Arc;
 
@@ -134,8 +135,28 @@ fn a_call_goes_to_the_tool_its_name_picks() {
     assert_eq!(dir.text(), "/p/\n  - a.md\n  - b.md");
     let grep = ran("grep", r#"{"pattern":"needle"}"#, &files).expect("the tree searches");
     assert_eq!(grep.text(), "/p/a.md\n  1:needle");
-    let stub = ran("write", r#"{"path":"/p/c.md","contents":"x"}"#, &files)
-        .expect("a stub answers its text");
-    assert_eq!(stub.text(), NOT_IMPLEMENTED.replace("<name>", "Write"));
+    let write =
+        ran("write", r#"{"path":"/p/c.md","contents":"x"}"#, &files).expect("the file is written");
+    assert_eq!(write.text(), "Wrote 1 byte.");
+    assert_eq!(files.read("/p/c.md", 0, u64::MAX), Ok(b"x".to_vec()));
+    let stub = ran(
+        "replace",
+        r#"{"path":"/p/c.md","old_string":"x","new_string":"y"}"#,
+        &files,
+    )
+    .expect("a stub answers its text");
+    assert_eq!(stub.text(), NOT_IMPLEMENTED.replace("<name>", "StrReplace"));
     assert!(stub.is_trusted());
+}
+
+#[test]
+fn an_instance_flags_the_tools_that_change_files_and_no_other() {
+    let pack = StdPack::new(spec::load().expect("every definition parses").into());
+    let flagged: Vec<&str> = pack
+        .tools
+        .iter()
+        .filter(|tool| tool.changes_files)
+        .map(|tool| tool.name.as_str())
+        .collect();
+    assert_eq!(flagged, ["write"]);
 }

@@ -74,11 +74,6 @@ fn each_run_gets_an_instance_of_its_own_with_the_same_tools() {
 fn every_stub_answers_the_not_implemented_text_naming_itself() {
     for (name, wire_name, args) in [
         (
-            "write",
-            "Write",
-            json!({ "path": "/notes.md", "contents": "hi" }),
-        ),
-        (
             "replace",
             "StrReplace",
             json!({ "path": "/notes.md", "old_string": "a", "new_string": "b" }),

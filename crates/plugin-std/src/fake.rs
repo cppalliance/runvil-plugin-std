@@ -8,7 +8,7 @@
 //! name may hold any character, a control character among them.
 //!
 //! Every node sits directly under `/`, or under a [`Node::Link`], which
-//! lists as a directory.
+//! lists as a directory. The tree never changes: it fails every change.
 
 use std::collections::BTreeMap;
 use std::future::Future;
@@ -162,5 +162,12 @@ impl Source for FakeSource {
         let mut bytes = self.read(path).await?;
         bytes.truncate(usize::try_from(len).unwrap_or(usize::MAX));
         Ok(bytes)
+    }
+
+    async fn write(&self, path: &str, _bytes: Vec<u8>) -> Result<(), FileError> {
+        Err(FileError::new(
+            FileErrorKind::Other,
+            format!("the fake tree takes no change: {path}"),
+        ))
     }
 }

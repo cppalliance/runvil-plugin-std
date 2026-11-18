@@ -66,11 +66,17 @@
 //! step every 32 files or directories, so a cancel or a stop can drop it
 //! between two steps. File text comes back as untrusted output.
 //!
-//! Write, StrReplace, Delete, and Glob are still stubs: a call with
-//! arguments that match the schema answers [`NOT_IMPLEMENTED`]. For every
-//! tool, a call whose arguments do not match fails with an
-//! invalid-arguments [`ToolError`](runvil_plugin_sdk::ToolError) naming
-//! the parameter.
+//! Write is real. It makes a file, or replaces the whole contents of one,
+//! with one write, and the Host makes each directory on the way to the
+//! file. It reads nothing first, so what was at the path is gone. It
+//! refuses contents over 16 MiB, the most one write takes. Its answer is
+//! the count of bytes written in fixed text, so it comes back as trusted
+//! output.
+//!
+//! StrReplace, Delete, and Glob are still stubs: a call with arguments
+//! that match the schema answers [`NOT_IMPLEMENTED`]. For every tool, a
+//! call whose arguments do not match fails with an invalid-arguments
+//! [`ToolError`](runvil_plugin_sdk::ToolError) naming the parameter.
 //!
 //! # Where the file access goes
 //!
@@ -78,11 +84,17 @@
 //! [`ToolCall`](runvil_plugin_sdk::ToolCall), never the disk directly.
 //! Each one ends the step of its call: the Host performs the operation
 //! under the run's policy, and a later step goes on with the answer. So
-//! a read the policy denies fails without the Pack deciding anything. A
-//! tool reports the [`FileError`](runvil_plugin_sdk::FileError) for the
-//! path its call names as a tool error the model can read. Below that
-//! path, ListDir fails the same way on a directory that is there and
-//! cannot be listed, and Grep skips the entry and counts it.
+//! an operation the policy denies fails without the Pack deciding
+//! anything. A tool reports the
+//! [`FileError`](runvil_plugin_sdk::FileError) for the path its call
+//! names as a tool error the model can read. Below that path, ListDir
+//! fails the same way on a directory that is there and cannot be listed,
+//! and Grep skips the entry and counts it.
+//!
+//! A tool that changes files says so to the Host, as Write does. The Host
+//! runs a call of such a tool by itself among the calls of one model
+//! reply, after the calls the reply lists before it, so two changes of
+//! one reply happen in the order the reply lists them.
 //!
 //! Shell is deliberately absent. An in-process shell over the same
 //! filesystem is a separate Pack, so a run that wants one declares it.
@@ -111,9 +123,12 @@
 //!   arguments, so a model can tell a bad call from a missing
 //!   implementation.
 //! - A key the schema does not declare is refused by name, with the
-//!   parameters listed, by the three real tools, Read, ListDir, and
-//!   Grep. The stubs let it through. Grep alone accepts `-n` when it is
+//!   parameters listed, by the four real tools, Read, ListDir, Grep, and
+//!   Write. The stubs let it through. Grep alone accepts `-n` when it is
 //!   `true`, because Cursor's definition once declared it.
+//! - A tool that changes files is flagged with
+//!   [`ToolInfo::changes_files`](runvil_plugin_sdk::ToolInfo::changes_files),
+//!   and a test holds the flags in place.
 
 mod check;
 mod dir;
@@ -128,6 +143,7 @@ mod refusal;
 mod source;
 mod spec;
 mod text;
+mod write;
 
 use std::sync::Arc;
 

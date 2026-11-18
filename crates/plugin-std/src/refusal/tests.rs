@@ -3,7 +3,7 @@
 
 use runvil_plugin_sdk::{FileError, FileErrorKind};
 
-use super::{missing_root, neither_file_nor_directory, not_a_directory, refusal};
+use super::{missing_root, neither_file_nor_directory, not_a_directory, refusal, write_refusal};
 
 /// The path the model wrote, and the resolved path every error text
 /// below names, which differs so a test can tell which one a sentence
@@ -96,6 +96,22 @@ fn a_failure_of_no_other_kind_reads_as_the_hosts_words() {
 }
 
 #[test]
+fn a_failure_of_a_kind_that_only_a_change_has_reads_as_the_hosts_words() {
+    for (kind, text) in [
+        (
+            FileErrorKind::AlreadyExists,
+            "already exists: /resolved/a.md",
+        ),
+        (
+            FileErrorKind::NotEmpty,
+            "directory not empty: /resolved/a.md",
+        ),
+    ] {
+        assert_eq!(say(&FileError::new(kind, text)), text, "{kind:?}");
+    }
+}
+
+#[test]
 fn a_relative_path_is_echoed_as_written_and_never_as_the_resolved_one() {
     let error = FileError::new(FileErrorKind::NotFound, "not found: /notes/a.md");
     let text = say(&error);
@@ -121,6 +137,35 @@ fn no_message_names_a_tool_other_than_the_one_called() {
         }
     }
     assert!(!neither_file_nor_directory("p").contains("Shell"));
+}
+
+#[test]
+fn a_write_under_something_that_is_not_a_directory_says_that_a_parent_is_not_one() {
+    assert_eq!(
+        write_refusal("Write", WRITTEN, &error(FileErrorKind::NotADirectory)),
+        "Path has a parent that is not a directory: notes/a.md"
+    );
+}
+
+#[test]
+fn every_other_failure_of_a_write_reads_as_the_shared_sentence() {
+    for kind in [
+        FileErrorKind::NotFound,
+        FileErrorKind::IsADirectory,
+        FileErrorKind::Conflict,
+        FileErrorKind::Io,
+        FileErrorKind::Denied,
+        FileErrorKind::AlreadyExists,
+        FileErrorKind::NotEmpty,
+        FileErrorKind::Other,
+    ] {
+        let error = error(kind);
+        assert_eq!(
+            write_refusal("Write", WRITTEN, &error),
+            refusal("Write", WRITTEN, &error),
+            "{kind:?}"
+        );
+    }
 }
 
 #[test]

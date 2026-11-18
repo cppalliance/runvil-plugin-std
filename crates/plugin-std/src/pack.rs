@@ -1,7 +1,7 @@
 //! The `std` Pack: its [`INFO`], [`StdPack`], one run's instance, which
 //! lists the Pack's tools and hands each call to its tool's module, and
-//! the stub that every tool but Read, ListDir, and Grep still answers
-//! with in this build.
+//! the stub that every tool but Read, ListDir, Grep, and Write still
+//! answers with in this build.
 
 use std::sync::Arc;
 
@@ -15,8 +15,8 @@ use crate::source::Source;
 use crate::spec::Definition;
 
 /// What a call to a tool that is still a stub answers in this build, when
-/// its arguments match the schema. Read, ListDir, and Grep are real and
-/// never answer this.
+/// its arguments match the schema. Read, ListDir, Grep, and Write are
+/// real and never answer this.
 ///
 /// The text says the implementation is missing rather than that the call
 /// was wrong, because a model that reads it should stop calling the tool.
@@ -44,21 +44,35 @@ pub(crate) struct StdPack {
 }
 
 impl StdPack {
-    /// Makes the instance, naming each tool by its definition's segment.
+    /// Makes the instance, naming each tool by its definition's segment
+    /// and saying which tools change files.
     pub(crate) fn new(definitions: Arc<[Definition]>) -> StdPack {
         let tools = definitions
             .iter()
             .map(|definition| {
-                ToolInfo::new(
+                let tool = ToolInfo::new(
                     definition.segment,
                     definition.description.clone(),
                     definition.parameters.to_string(),
                 )
-                .wire_name(definition.wire_name.clone())
+                .wire_name(definition.wire_name.clone());
+                if changes_files(definition.segment) {
+                    tool.changes_files()
+                } else {
+                    tool
+                }
             })
             .collect();
         StdPack { definitions, tools }
     }
+}
+
+/// Whether a call of the tool with the id segment `segment` changes files
+/// of its run. The Host runs a call of such a tool by itself among the
+/// calls of one model reply, after the calls the reply lists before it,
+/// so two changes of one reply happen in the order the reply lists them.
+fn changes_files(segment: &str) -> bool {
+    segment == "write"
 }
 
 /// The stub text for the tool the model calls `wire_name`.
@@ -98,6 +112,7 @@ async fn run(
         "read" => crate::read::call(source, definition, &args).await,
         "dir" => crate::dir::call(source, definition, &args).await,
         "grep" => crate::grep::call(source, definition, &args).await,
+        "write" => crate::write::call(source, definition, &args).await,
         _ => Ok(ToolOutput::trusted(stub(&definition.wire_name))),
     }
 }

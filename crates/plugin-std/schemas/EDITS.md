@@ -16,7 +16,8 @@ Each file in this directory except `dir.json` is Cursor's definition of the tool
 
 ## write.json
 
-- Cursor's `Write` description, which is about creating or overwriting a file. Reworded to name `StrReplace` for targeted changes and to require a read before overwriting, matching Cursor's own guidance. No behavior was added; only the wording is ours.
+- Cursor's `Write` description, which is about creating or overwriting a file. Reworded to name `StrReplace` for targeted changes and to require a read before overwriting, matching Cursor's own guidance. The parameters, their types, and the `required` list are Cursor's.
+- Added a `Usage` list that states what Write does: the directories on the way to the file are created, `contents` is written exactly as given and holds at most `{write_limit}` bytes, a path that names a directory fails, and the calls in one response that change files run one after another in the order listed. The placeholder is filled when the definition is built, from the SDK's limit on one write, which the code enforces, so the text and the limit cannot drift apart.
 
 ## replace.json
 

@@ -12,7 +12,7 @@
 
 use runvil_plugin_sdk::{DirEntry, FileError, Stat, ToolCall};
 
-/// Where a tool reads the run's files from.
+/// Where a tool reaches the run's files.
 pub(crate) trait Source {
     /// Metadata for `path`, without following a link.
     async fn stat(&self, path: &str) -> Result<Stat, FileError>;
@@ -26,6 +26,11 @@ pub(crate) trait Source {
     /// At most the first `len` bytes of the file at `path`, for a path
     /// whose size is not known beforehand.
     async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError>;
+
+    /// Writes `bytes` as the whole contents of the file at `path`. The
+    /// file is made when it is absent, with each directory on the way to
+    /// it.
+    async fn write(&self, path: &str, bytes: Vec<u8>) -> Result<(), FileError>;
 }
 
 impl Source for ToolCall<'_> {
@@ -43,6 +48,10 @@ impl Source for ToolCall<'_> {
 
     async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError> {
         ToolCall::read_range(self, path, 0, len).await
+    }
+
+    async fn write(&self, path: &str, bytes: Vec<u8>) -> Result<(), FileError> {
+        ToolCall::write(self, path, bytes).await
     }
 }
 
@@ -66,5 +75,9 @@ impl Source for runvil_plugin_sdk::testing::Files {
 
     async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError> {
         runvil_plugin_sdk::testing::Files::read(self, path, 0, len)
+    }
+
+    async fn write(&self, path: &str, bytes: Vec<u8>) -> Result<(), FileError> {
+        runvil_plugin_sdk::testing::Files::write(self, path, bytes)
     }
 }
