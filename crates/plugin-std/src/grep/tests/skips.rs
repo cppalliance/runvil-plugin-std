@@ -220,6 +220,32 @@ fn a_file_that_is_longer_than_its_listing_said_is_skipped_and_not_searched() {
 }
 
 #[test]
+fn a_read_that_turns_out_over_the_size_limit_counts_toward_the_byte_limit() {
+    // Each listing says 10 bytes, and each read brings 101, one more than
+    // the size limit. The second read brings the count to the byte limit,
+    // so the search stops before it reads the third file.
+    let grown = Node::Sized(10, vec![b'a'; 500]);
+    let source = FakeSource::default()
+        .with("/a.log", grown.clone())
+        .with("/b.log", grown.clone())
+        .with("/c.log", grown);
+    let limits = Limits {
+        max_bytes: 202,
+        ..small_files()
+    };
+    let output =
+        grep_over(&source, &json!({ "pattern": "a" }), &limits).expect("the search succeeds");
+    assert_eq!(
+        output.text(),
+        "No matches found. Searched 0 files.\n\n\
+         [Skipped 2 entries: 2 files over 100 bytes. First: /a.log, /b.log]\n\
+         [No ignore rules ran: .gitignore is not applied, and only entries named .git are \
+         skipped.]\n\
+         [Search stopped after reading 202 bytes. Narrow path, glob or type to search the rest.]"
+    );
+}
+
+#[test]
 fn a_file_exactly_at_the_size_limit_is_searched() {
     let mut edge = b"NEEDLE\n".to_vec();
     edge.resize(100, b'a');

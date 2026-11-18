@@ -201,7 +201,6 @@ impl<S: Source> Search<'_, '_, S> {
             self.skip(Reason::OverSize, Some(&node.shown));
             return Ok(());
         };
-        self.bytes += length(&bytes);
         self.consume(&node.shown, &bytes);
         Ok(())
     }
@@ -209,13 +208,16 @@ impl<S: Source> Search<'_, '_, S> {
     /// The bytes of the file at `path`, or `None` for a file over the
     /// largest size a search takes. The read asks for one byte past that
     /// size and no more, so a file that is longer than its listing or its
-    /// stat said shows as over the size and is never held whole.
-    async fn read(&self, path: &str) -> Result<Option<Vec<u8>>, FileError> {
+    /// stat said shows as over the size and is never held whole. Every
+    /// byte that the read brings counts toward the most a search reads,
+    /// the bytes of a file that is then skipped among them.
+    async fn read(&mut self, path: &str) -> Result<Option<Vec<u8>>, FileError> {
         let most = self.limits.max_file_size;
         let bytes = self
             .source
             .read_prefix(path, most.saturating_add(1))
             .await?;
+        self.bytes += length(&bytes);
         Ok((length(&bytes) <= most).then_some(bytes))
     }
 
@@ -296,10 +298,7 @@ impl<S: Source> Search<'_, '_, S> {
             return;
         }
         match self.read(&node.access).await {
-            Ok(Some(bytes)) => {
-                self.bytes += length(&bytes);
-                self.consume(&node.shown, &bytes);
-            }
+            Ok(Some(bytes)) => self.consume(&node.shown, &bytes),
             Ok(None) => self.skip(Reason::OverSize, Some(&node.shown)),
             Err(error) => self.skip(file_reason(&error), Some(&node.shown)),
         }
