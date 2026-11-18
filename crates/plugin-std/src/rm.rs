@@ -4,8 +4,10 @@
 //! through the call's [`Source`], so the run's policy applies. The stat
 //! comes first because the removal the Host offers also takes a
 //! directory with no entries, and Delete removes no directory: it
-//! refuses one with a sentence. A link goes as a link, so what it leads
-//! to stays. The answer is fixed text, so it is trusted output.
+//! refuses one with a sentence. The two are requests of their own, so a
+//! directory with no entries that another task puts at the path between
+//! them is removed. A link goes as a link, so what it leads to stays. The
+//! answer is fixed text, so it is trusted output.
 
 use runvil_plugin_sdk::{FileError, FileType, ToolError, ToolErrorKind, ToolOutput};
 use serde_json::Value;

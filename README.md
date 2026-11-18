@@ -19,6 +19,7 @@ The Plugin inserts one Pack, `runvil/std`, which gives a run the standard file t
 - File text and file names come back as untrusted output. The Host marks them before a model reads them. The answer to a change holds fixed text and at most a count, so it is trusted output.
 - Write, StrReplace, and Delete say to the Host that they change files. The Host runs a call of such a tool by itself among the calls of one model reply, so two changes of one reply happen in the order the reply lists them.
 - StrReplace edits a file with a read and then a write, so a change that another task makes to the file between the two is lost.
+- Delete asks what a path names and then asks for its removal, so a directory with no entries that another task puts at the path between the two is removed.
 - A tool call ends its step at each file operation, and the Host performs the operation before the next step. A search also ends its step every 32 files or directories, so the Host can cancel a call between two steps.
 
 ## Building

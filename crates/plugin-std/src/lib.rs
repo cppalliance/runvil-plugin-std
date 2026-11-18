@@ -85,8 +85,10 @@
 //!
 //! Delete is real. It asks what the path names and then asks for its
 //! removal. It refuses a directory with a sentence, and it fails on a
-//! path where nothing is. A link goes as a link, so what it leads to
-//! stays. Its answer is fixed text, so it comes back as trusted output.
+//! path where nothing is. The delete is a stat and then a removal, so a
+//! directory with no entries that another task puts at the path between
+//! the two is removed. A link goes as a link, so what it leads to stays.
+//! Its answer is fixed text, so it comes back as trusted output.
 //!
 //! Glob is still a stub: a call with arguments that match the schema
 //! answers [`NOT_IMPLEMENTED`]. For every tool, a call whose arguments do
