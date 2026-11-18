@@ -28,7 +28,7 @@ Anything else gets a qualified lowercase name, such as Rust's built-in test harn
 - The Plugin crate depends on `runvil-plugin-sdk` and outside libraries alone, and writes no `unsafe`. The SDK owns the C boundary.
 - A tool reaches files only through `Source` (`crates/plugin-std/src/source.rs`), which the call's `ToolCall` implements, so every file operation goes through the Host and the run's policy applies to it. A test runs a tool's own code over the SDK's `testing::Files` tree, or over `FakeSource` (`crates/plugin-std/src/fake.rs`) for what that tree cannot hold.
 - A tool that changes files says so with `ToolInfo::changes_files`, so the Host runs each of its calls by itself among the calls of one model reply.
-- StrReplace and Delete are stubs until each is built on the file methods of the SDK that change files, which `Source` gains with them.
+- Delete is a stub until it is built on the file method of the SDK that removes a file, which `Source` gains with it.
 - A tool's description and parameter schema come from its JSON file under `crates/plugin-std/schemas`. `EDITS.md` beside them records every difference from Cursor's definition, and a change to a JSON file changes `EDITS.md` with it.
 - A tool that does a long job awaits `next_step()` after each bounded slice of work, as Grep does every 32 files or directories, so that no step of its call works for long and the Host can abandon the call between two steps.
 - A Plugin shares its process with the Host, so nothing here installs process-global state, such as a panic hook (`clippy.toml` bans `std::panic::set_hook`), and nothing starts a thread that outlives the Plugin's unload. What every run shares lives in the Plugin instance and never in a `static`, so an unload frees it.

@@ -4,11 +4,13 @@
 //!
 //! The fake holds what the fake Host's tree cannot: a link to a directory
 //! or to a file, a pipe, a file whose listed size differs from its bytes,
-//! and a directory or a file that fails only when it is listed or read. A
-//! name may hold any character, a control character among them.
+//! a directory or a file that fails only when it is listed or read, and a
+//! file that fails only a change. A name may hold any
+//! character, a control character among them.
 //!
 //! Every node sits directly under `/`, or under a [`Node::Link`], which
-//! lists as a directory. The tree never changes: it fails every change.
+//! lists as a directory. The tree never changes: it fails every change,
+//! with the error of a [`Node::Guarded`] where the path names one.
 
 use std::collections::BTreeMap;
 use std::future::Future;
@@ -55,6 +57,9 @@ pub(crate) enum Node {
     ListFails(FileError),
     /// A file whose read fails with this error.
     ReadFails(FileError),
+    /// A file with these bytes that fails each change with this error, as
+    /// a file that the run's policy lets a tool read and not change.
+    Guarded(Vec<u8>, FileError),
 }
 
 /// A tree of nodes by absolute path, with `/` always a directory.
@@ -79,7 +84,9 @@ impl FakeSource {
     /// The metadata of `node`.
     fn stat_of(node: &Node) -> Stat {
         match node {
-            Node::File(bytes) => Stat::new(FileType::File, bytes.len() as u64),
+            Node::File(bytes) | Node::Guarded(bytes, _) => {
+                Stat::new(FileType::File, bytes.len() as u64)
+            }
             Node::Sized(size, _) => Stat::new(FileType::File, *size),
             Node::ReadFails(_) => Stat::new(FileType::File, 1),
             Node::ListFails(_) => Stat::new(FileType::Directory, 0),
@@ -93,6 +100,18 @@ impl FakeSource {
     /// The error for a path that is not there.
     fn missing(path: &str) -> FileError {
         FileError::new(FileErrorKind::NotFound, format!("not found: {path}"))
+    }
+
+    /// The error of a change to `path`, which the tree never takes: the
+    /// error of a [`Node::Guarded`], and a fixed one for any other path.
+    fn refused(&self, path: &str) -> FileError {
+        match self.nodes.get(path) {
+            Some(Node::Guarded(_, error)) => error.clone(),
+            _ => FileError::new(
+                FileErrorKind::Other,
+                format!("the fake tree takes no change: {path}"),
+            ),
+        }
     }
 }
 
@@ -146,9 +165,12 @@ impl Source for FakeSource {
 
     async fn read(&self, path: &str) -> Result<Vec<u8>, FileError> {
         match self.nodes.get(path) {
-            Some(Node::File(bytes) | Node::Sized(_, bytes) | Node::LinkToFile(bytes)) => {
-                Ok(bytes.clone())
-            }
+            Some(
+                Node::File(bytes)
+                | Node::Sized(_, bytes)
+                | Node::LinkToFile(bytes)
+                | Node::Guarded(bytes, _),
+            ) => Ok(bytes.clone()),
             Some(Node::ReadFails(error) | Node::LinkFails(error)) => Err(error.clone()),
             Some(Node::Link | Node::ListFails(_)) => Err(FileError::new(
                 FileErrorKind::IsADirectory,
@@ -165,9 +187,6 @@ impl Source for FakeSource {
     }
 
     async fn write(&self, path: &str, _bytes: Vec<u8>) -> Result<(), FileError> {
-        Err(FileError::new(
-            FileErrorKind::Other,
-            format!("the fake tree takes no change: {path}"),
-        ))
+        Err(self.refused(path))
     }
 }

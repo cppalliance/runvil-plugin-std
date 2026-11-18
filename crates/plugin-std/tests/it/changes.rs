@@ -59,7 +59,7 @@ fn the_tools_that_change_files_say_so_to_the_host_and_no_other_tool_does() {
         .filter(|tool| tool.changes_files)
         .map(|tool| tool.name.as_str())
         .collect();
-    assert_eq!(flagged, ["write"]);
+    assert_eq!(flagged, ["write", "replace"]);
 }
 
 #[test]
@@ -149,4 +149,90 @@ fn a_later_call_of_the_run_reads_what_a_write_left() {
         .expect("the call follows the contract")
         .expect("the file reads");
     assert_eq!(read.text(), "     1|one\n     2|two\n");
+}
+
+#[test]
+fn str_replace_edits_the_one_occurrence_and_answers_the_count_as_trusted_output() {
+    let (result, files) = change(
+        Files::new().file("/a.md", "one\ntwo\nthree\n"),
+        "replace",
+        &json!({ "path": "/a.md", "old_string": "two", "new_string": "2" }),
+    );
+    let output = result.expect("the file is edited");
+    assert_eq!(output.text(), "Made 1 replacement.");
+    assert!(output.is_trusted());
+    assert_eq!(contents(&files, "/a.md"), Ok(b"one\n2\nthree\n".to_vec()));
+}
+
+#[test]
+fn str_replace_with_replace_all_edits_every_occurrence() {
+    let (result, files) = change(
+        Files::new().file("/a.rs", "let x = x + x;\n"),
+        "replace",
+        &json!({
+            "path": "/a.rs", "old_string": "x", "new_string": "total", "replace_all": true
+        }),
+    );
+    let output = result.expect("the file is edited");
+    assert_eq!(output.text(), "Made 3 replacements.");
+    assert_eq!(
+        contents(&files, "/a.rs"),
+        Ok(b"let total = total + total;\n".to_vec())
+    );
+}
+
+#[test]
+fn str_replace_asks_the_host_for_a_stat_a_read_and_a_write() {
+    let files = Files::new().file("/a.md", "one two\n");
+    let args = json!({ "path": "/a.md", "old_string": "two", "new_string": "2" });
+    assert_eq!(steps(files, "replace", &args), 4);
+}
+
+#[test]
+fn an_edit_whose_text_does_not_occur_once_fails_with_the_count_before_any_write() {
+    let before = Files::new().file("/a.rs", "let x = x + x;\n");
+    let args = json!({ "path": "/a.rs", "old_string": "x", "new_string": "total" });
+    let (result, after) = change(before.clone(), "replace", &args);
+    let error = result.expect_err("the text occurs three times");
+    assert_eq!(
+        error.message(),
+        "`old_string` occurs 3 times in /a.rs, and it must occur exactly once. Add text around \
+         it until it names one occurrence, or set `replace_all` to replace every one."
+    );
+    assert_eq!(error.kind(), ToolErrorKind::Other);
+    assert_eq!(after, before);
+    assert_eq!(steps(before, "replace", &args), 3, "the stat and the read");
+}
+
+#[test]
+fn an_edit_the_policy_denies_fails_with_the_policys_own_reason_and_changes_nothing() {
+    let reason = "Mode::Ask allows no read of /vault.md";
+    let before = Files::new()
+        .file("/a.md", "kept")
+        .fails("/vault.md", FileError::new(FileErrorKind::Denied, reason));
+    let (result, after) = change(
+        before.clone(),
+        "replace",
+        &json!({ "path": "/vault.md", "old_string": "a", "new_string": "b" }),
+    );
+    let error = result.expect_err("the policy denies the edit");
+    assert_eq!(error.message(), reason);
+    assert_eq!(after, before);
+}
+
+#[test]
+fn two_edits_of_one_file_in_a_run_both_apply() {
+    let loaded = testing::load::<Std>().expect("the Plugin loads");
+    let pack = loaded
+        .new_pack(PACK)
+        .expect("the Pack instance is made")
+        .with_files(Files::new().file("/a.md", "one two three\n"));
+    for (old, new) in [("one", "1"), ("three", "3")] {
+        let args = json!({ "path": "/a.md", "old_string": old, "new_string": new });
+        let edited = pack
+            .call("replace", &args.to_string())
+            .expect("the call follows the contract");
+        assert!(edited.is_ok(), "{old}");
+    }
+    assert_eq!(contents(pack.files(), "/a.md"), Ok(b"1 two 3\n".to_vec()));
 }

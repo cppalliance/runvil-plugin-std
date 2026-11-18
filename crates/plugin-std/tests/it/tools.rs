@@ -73,11 +73,6 @@ fn each_run_gets_an_instance_of_its_own_with_the_same_tools() {
 #[test]
 fn every_stub_answers_the_not_implemented_text_naming_itself() {
     for (name, wire_name, args) in [
-        (
-            "replace",
-            "StrReplace",
-            json!({ "path": "/notes.md", "old_string": "a", "new_string": "b" }),
-        ),
         ("rm", "Delete", json!({ "path": "/notes.md" })),
         ("glob", "Glob", json!({ "glob_pattern": "**/*.md" })),
     ] {

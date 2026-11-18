@@ -171,6 +171,37 @@ fn the_write_description_holds_the_limit_of_one_write_and_states_what_the_tool_d
 }
 
 #[test]
+fn the_replace_description_holds_the_file_ceiling_and_states_what_the_tool_does() {
+    let definitions = all();
+    let replace = definitions
+        .iter()
+        .find(|definition| definition.segment == "replace")
+        .expect("the replace definition exists");
+    let text = &replace.description;
+    assert!(
+        text.contains("over 16777216 bytes"),
+        "the file ceiling is named: {text}"
+    );
+    assert!(
+        !text.contains("{file_ceiling}"),
+        "{{file_ceiling}} is filled in: {text}"
+    );
+    for phrase in [
+        "matched exactly",
+        "line endings",
+        "how many times it occurs",
+        "replaces every occurrence",
+        "UTF-8",
+        "one after another",
+    ] {
+        assert!(
+            text.contains(phrase),
+            "the description names {phrase}: {text}"
+        );
+    }
+}
+
+#[test]
 fn the_dir_description_holds_the_body_cap_and_no_unfilled_placeholder() {
     let definitions = all();
     let dir = definitions

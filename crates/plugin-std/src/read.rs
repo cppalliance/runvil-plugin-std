@@ -55,18 +55,7 @@ async fn read_file(
 ) -> Result<ToolOutput, ToolError> {
     let path = request.path;
     let message = |text: String| ToolError::new(ToolErrorKind::Other, text);
-    let failed = |error: FileError| message(refusal(tool, path, &error));
-    let stat = source.stat(path).await.map_err(failed)?;
-    check_type(path, stat.file_type).map_err(message)?;
-    let bytes = source
-        .read_prefix(path, MAX_FILE_BYTES + 1)
-        .await
-        .map_err(failed)?;
-    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_FILE_BYTES {
-        return Err(message(format!(
-            "File is too large to read: {path} is over the limit of {MAX_FILE_BYTES} bytes."
-        )));
-    }
+    let bytes = load(source, tool, path).await.map_err(message)?;
     if sniff_binary(&bytes) {
         return Err(message(format!(
             "File content is binary data, not text: {path}"
@@ -90,14 +79,43 @@ async fn read_file(
     )))
 }
 
-/// Decides from the kind of node at `path` whether Read goes on: a file
-/// or a link does, and anything else gets the sentence that says why not.
+/// The bytes of the file at `path`, for a tool that works on a file's
+/// text: Read, and StrReplace, which edits what Read shows. `tool` is the
+/// name the model called the tool by.
+///
+/// The stat comes first, so a directory and a special file are refused
+/// and never opened. The read stops one byte past the ceiling, so a file
+/// over it is refused and never held whole.
+///
+/// # Errors
+/// Returns the sentence a model reads when the path is missing, names a
+/// directory or a special file, holds more than [`MAX_FILE_BYTES`] bytes,
+/// or cannot be read.
+pub(crate) async fn load(source: &impl Source, tool: &str, path: &str) -> Result<Vec<u8>, String> {
+    let failed = |error: FileError| refusal(tool, path, &error);
+    let stat = source.stat(path).await.map_err(failed)?;
+    check_type(path, stat.file_type)?;
+    let bytes = source
+        .read_prefix(path, MAX_FILE_BYTES + 1)
+        .await
+        .map_err(failed)?;
+    if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_FILE_BYTES {
+        return Err(format!(
+            "File is too large to read: {path} is over the limit of {MAX_FILE_BYTES} bytes."
+        ));
+    }
+    Ok(bytes)
+}
+
+/// Decides from the kind of node at `path` whether its bytes are read: a
+/// file or a link is read, and anything else gets the sentence that says
+/// why not.
 fn check_type(path: &str, file_type: FileType) -> Result<(), String> {
     match file_type {
         FileType::File | FileType::Symlink => Ok(()),
         FileType::Directory => Err(format!("Path is a directory, not a file: {path}")),
         // A pipe, a socket, or a device, and any kind added later: none
-        // of them is text Read can window.
+        // of them holds text, and a read of one can block for good.
         _ => Err(neither_file_nor_directory(path)),
     }
 }

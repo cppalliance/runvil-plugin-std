@@ -139,13 +139,16 @@ fn a_call_goes_to_the_tool_its_name_picks() {
         ran("write", r#"{"path":"/p/c.md","contents":"x"}"#, &files).expect("the file is written");
     assert_eq!(write.text(), "Wrote 1 byte.");
     assert_eq!(files.read("/p/c.md", 0, u64::MAX), Ok(b"x".to_vec()));
-    let stub = ran(
+    let replace = ran(
         "replace",
         r#"{"path":"/p/c.md","old_string":"x","new_string":"y"}"#,
         &files,
     )
-    .expect("a stub answers its text");
-    assert_eq!(stub.text(), NOT_IMPLEMENTED.replace("<name>", "StrReplace"));
+    .expect("the file is edited");
+    assert_eq!(replace.text(), "Made 1 replacement.");
+    assert_eq!(files.read("/p/c.md", 0, u64::MAX), Ok(b"y".to_vec()));
+    let stub = ran("rm", r#"{"path":"/p/c.md"}"#, &files).expect("a stub answers its text");
+    assert_eq!(stub.text(), NOT_IMPLEMENTED.replace("<name>", "Delete"));
     assert!(stub.is_trusted());
 }
 
@@ -158,5 +161,5 @@ fn an_instance_flags_the_tools_that_change_files_and_no_other() {
         .filter(|tool| tool.changes_files)
         .map(|tool| tool.name.as_str())
         .collect();
-    assert_eq!(flagged, ["write"]);
+    assert_eq!(flagged, ["write", "replace"]);
 }

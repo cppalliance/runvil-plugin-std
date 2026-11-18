@@ -22,6 +22,7 @@ Each file in this directory except `dir.json` is Cursor's definition of the tool
 ## replace.json
 
 - Cursor's `StrReplace` definition. The wording is ours; the parameters, their types, and the `required` list are Cursor's.
+- Added a `Usage` list that states what StrReplace does: `old_string` is matched exactly, and the line number and the pipe that Read shows are not part of the file; a call fails with the count when `old_string` does not occur exactly once, and with `replace_all` it fails only when there is no occurrence; only UTF-8 text is edited, and a file over `{file_ceiling}` bytes is refused; and the calls in one response that change files run one after another in the order listed. The placeholder is filled when the definition is built, from the constant the code enforces, so the text and the limit cannot drift apart.
 
 ## rm.json
 

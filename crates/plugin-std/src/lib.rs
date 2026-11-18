@@ -73,9 +73,19 @@
 //! the count of bytes written in fixed text, so it comes back as trusted
 //! output.
 //!
-//! StrReplace, Delete, and Glob are still stubs: a call with arguments
-//! that match the schema answers [`NOT_IMPLEMENTED`]. For every tool, a
-//! call whose arguments do not match fails with an invalid-arguments
+//! StrReplace is real. It reads a file as Read does, with the same
+//! refusals of a directory, a special file, and a file over 16 MiB, and
+//! it writes the file back with one text in place of another. The file
+//! must hold UTF-8, and nothing outside the matches changes. The text to
+//! replace must occur exactly once, unless `replace_all` is set, and a
+//! failure states how many times it occurs. The edit is a read and then a
+//! write, so a change that another task makes to the file between the two
+//! is lost. Its answer is the count of replacements in fixed
+//! text, so it comes back as trusted output.
+//!
+//! Delete and Glob are still stubs: a call with arguments that match the
+//! schema answers [`NOT_IMPLEMENTED`]. For every tool, a call whose
+//! arguments do not match fails with an invalid-arguments
 //! [`ToolError`](runvil_plugin_sdk::ToolError) naming the parameter.
 //!
 //! # Where the file access goes
@@ -91,10 +101,10 @@
 //! fails the same way on a directory that is there and cannot be listed,
 //! and Grep skips the entry and counts it.
 //!
-//! A tool that changes files says so to the Host, as Write does. The Host
-//! runs a call of such a tool by itself among the calls of one model
-//! reply, after the calls the reply lists before it, so two changes of
-//! one reply happen in the order the reply lists them.
+//! A tool that changes files says so to the Host, as Write and StrReplace
+//! do. The Host runs a call of such a tool by itself among the calls of
+//! one model reply, after the calls the reply lists before it, so two
+//! changes of one reply happen in the order the reply lists them.
 //!
 //! Shell is deliberately absent. An in-process shell over the same
 //! filesystem is a separate Pack, so a run that wants one declares it.
@@ -123,9 +133,10 @@
 //!   arguments, so a model can tell a bad call from a missing
 //!   implementation.
 //! - A key the schema does not declare is refused by name, with the
-//!   parameters listed, by the four real tools, Read, ListDir, Grep, and
-//!   Write. The stubs let it through. Grep alone accepts `-n` when it is
-//!   `true`, because Cursor's definition once declared it.
+//!   parameters listed, by the five real tools, Read, ListDir, Grep,
+//!   Write, and StrReplace. The stubs let it through. Grep alone accepts
+//!   `-n` when it is `true`, because Cursor's definition once declared
+//!   it.
 //! - A tool that changes files is flagged with
 //!   [`ToolInfo::changes_files`](runvil_plugin_sdk::ToolInfo::changes_files),
 //!   and a test holds the flags in place.
@@ -140,6 +151,7 @@ mod order;
 mod pack;
 mod read;
 mod refusal;
+mod replace;
 mod source;
 mod spec;
 mod text;
