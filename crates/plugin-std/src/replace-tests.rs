@@ -8,6 +8,7 @@ use runvil_plugin_sdk::{
 };
 use serde_json::{Value, json};
 
+use super::edited_len;
 use crate::fake::{FakeSource, Node, block_on};
 use crate::source::Source;
 use crate::spec::{self, Definition};
@@ -303,6 +304,50 @@ fn an_edit_that_grows_the_file_past_one_write_is_refused_and_one_at_the_limit_is
     assert_eq!(
         files.stat("/edge.txt"),
         Ok(Stat::new(FileType::File, 16_777_216))
+    );
+}
+
+#[test]
+fn an_edit_far_past_one_write_is_refused_from_the_count_before_it_is_built() {
+    // Each of the 1 MiB of matches would become 16 MiB, which is 16 TiB
+    // in all. No machine holds a text of that length, so a call that
+    // built the edited text before it checked the length could not
+    // answer.
+    let files = Files::new().file("/wide.txt", "a".repeat(1_048_576));
+    let wide = 1_048_576_usize.saturating_mul(16_777_216);
+    assert_eq!(
+        failure_of(edit_all(&files, "/wide.txt", "a", &"b".repeat(16_777_216))),
+        format!(
+            "The edit would leave /wide.txt with {wide} bytes, and one write takes at most \
+             16777216 bytes."
+        )
+    );
+    assert_eq!(
+        files.read("/wide.txt", 0, 4),
+        Ok(b"aaaa".to_vec()),
+        "the file stays as it was"
+    );
+}
+
+#[test]
+fn the_length_of_an_edit_follows_from_the_count_of_its_matches() {
+    for (text, old, new) in [
+        ("x x x", "x", "yy"),
+        ("x x x", "x ", ""),
+        ("aaa", "aa", "b"),
+        ("caf\u{e9} caf\u{e9}", "\u{e9}", "e"),
+    ] {
+        let count = text.matches(old).count();
+        assert_eq!(
+            edited_len(text.len(), count, old.len(), new.len()),
+            text.replace(old, new).len(),
+            "{text:?}: {old:?} to {new:?}"
+        );
+    }
+    assert_eq!(
+        edited_len(usize::MAX, usize::MAX, 1, usize::MAX),
+        usize::MAX,
+        "a length past the range of usize is its largest value"
     );
 }
 

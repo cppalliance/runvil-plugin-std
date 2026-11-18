@@ -6,7 +6,9 @@
 //! must hold UTF-8. Nothing is decoded, and nothing outside the matches
 //! changes, so a byte order mark and the line endings stay as they are.
 //! The text to replace must occur exactly once, unless `replace_all` is
-//! set, and a failure states how many times it occurs.
+//! set, and a failure states how many times it occurs. An edit that would
+//! leave the file longer than one write takes is refused from the count
+//! of matches, before the edited text is built.
 //!
 //! The edit is a read and then a write, each a request to the Host of its
 //! own. A change that another task makes to the file between the two is
@@ -66,14 +68,18 @@ pub(crate) async fn call(
     if count == 0 || (count > 1 && !request.all) {
         return Err(message(miscount(path, count, request.all)));
     }
-    let edited = text.replace(request.old, request.new);
-    if edited.len() > RV_MAX_WRITE {
+    // The length of the edited text follows from the count, so an edit
+    // that is too long is refused before any of it is built. A call with
+    // `replace_all` could otherwise ask for far more memory than the
+    // file and its arguments hold.
+    let len = edited_len(text.len(), count, request.old.len(), request.new.len());
+    if len > RV_MAX_WRITE {
         return Err(message(format!(
-            "The edit would leave {path} with {} bytes, and one write takes at most \
-             {RV_MAX_WRITE} bytes.",
-            edited.len()
+            "The edit would leave {path} with {len} bytes, and one write takes at most \
+             {RV_MAX_WRITE} bytes."
         )));
     }
+    let edited = text.replace(request.old, request.new);
     source
         .write(path, edited.into_bytes())
         .await
@@ -121,6 +127,16 @@ fn parse<'a>(definition: &Definition, args: &'a Value) -> Result<Request<'a>, To
         new,
         all,
     })
+}
+
+/// The length in bytes of a text of `len` bytes once each of its `count`
+/// matches, of `old` bytes, has given way to `new` bytes. The matches do
+/// not overlap, so together they take up no more than `len` bytes. A
+/// length past the range of `usize` is its largest value, which is over
+/// every limit.
+fn edited_len(len: usize, count: usize, old: usize, new: usize) -> usize {
+    len.saturating_sub(count.saturating_mul(old))
+        .saturating_add(count.saturating_mul(new))
 }
 
 /// The sentence for a text to replace that occurs `count` times in the
