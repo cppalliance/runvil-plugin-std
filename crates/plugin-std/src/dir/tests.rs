@@ -82,10 +82,6 @@ where
         (self.0)(path)
     }
 
-    async fn read(&self, path: &str) -> Result<Vec<u8>, FileError> {
-        panic!("the walk read {path}")
-    }
-
     async fn read_prefix(&self, path: &str, _len: u64) -> Result<Vec<u8>, FileError> {
         panic!("the walk read {path}")
     }

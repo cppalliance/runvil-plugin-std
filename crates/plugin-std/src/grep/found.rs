@@ -29,7 +29,9 @@ pub(super) struct Limits {
     pub(super) max_files: usize,
     /// The most bytes read before the search stops.
     pub(super) max_bytes: u64,
-    /// The largest file, by the size its listing gives, that is searched.
+    /// The largest file that is searched. A longer one is skipped by the
+    /// size its listing gives, and failing that by a read that stops one
+    /// byte past this size.
     pub(super) max_file_size: u64,
     /// The files considered and directories listed between two pauses.
     pub(super) slice_entries: usize,
@@ -61,7 +63,7 @@ pub(super) enum Reason {
     UnreadableDirectory,
     /// A file that could not be read.
     UnreadableFile,
-    /// A file whose listed size is over the limit.
+    /// A file over the size limit, by its listed size or by its bytes.
     OverSize,
     /// A symbolic link, which is never entered or read.
     SymbolicLink,

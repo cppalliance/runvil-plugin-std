@@ -20,11 +20,10 @@ pub(crate) trait Source {
     /// The entries of the directory at `path`, in no promised order.
     async fn list(&self, path: &str) -> Result<Vec<DirEntry>, FileError>;
 
-    /// The whole contents of the file at `path`.
-    async fn read(&self, path: &str) -> Result<Vec<u8>, FileError>;
-
-    /// At most the first `len` bytes of the file at `path`, for a path
-    /// whose size is not known beforehand.
+    /// At most the first `len` bytes of the file at `path`. It is the one
+    /// read there is: a tool asks for one byte more than the largest file
+    /// it takes, so a longer file shows as such and is never held whole,
+    /// whatever a stat or a listing said of its size.
     async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError>;
 
     /// Writes `bytes` as the whole contents of the file at `path`. The
@@ -44,10 +43,6 @@ impl Source for ToolCall<'_> {
 
     async fn list(&self, path: &str) -> Result<Vec<DirEntry>, FileError> {
         ToolCall::list(self, path).await
-    }
-
-    async fn read(&self, path: &str) -> Result<Vec<u8>, FileError> {
-        ToolCall::read(self, path).await
     }
 
     async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError> {
@@ -75,10 +70,6 @@ impl Source for runvil_plugin_sdk::testing::Files {
 
     async fn list(&self, path: &str) -> Result<Vec<DirEntry>, FileError> {
         runvil_plugin_sdk::testing::Files::list(self, path)
-    }
-
-    async fn read(&self, path: &str) -> Result<Vec<u8>, FileError> {
-        runvil_plugin_sdk::testing::Files::read(self, path, 0, u64::MAX)
     }
 
     async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError> {

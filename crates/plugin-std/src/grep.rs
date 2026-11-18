@@ -2,13 +2,14 @@
 //! path.
 //!
 //! Grep walks the tree through the call's [`Source`], so the run's policy
-//! applies, and reads each file whole, never more than 16 MiB of it.
-//! Files come in path order, the order Glob uses. The lines of the answer
-//! stop at 15,000 bytes, with the notes under them not counted, and every
-//! call runs from the start, so a call with an `offset` pages through the
-//! same result. An entry below the path the call names that cannot be
-//! searched is skipped and counted, never a failure. The text of the
-//! files is returned as untrusted output.
+//! applies. It reads each file with one request, which asks for no more
+//! than one byte past 16 MiB, so a longer file is skipped and never held
+//! whole. Files come in path order, the order Glob uses. The lines of the
+//! answer stop at 15,000 bytes, with the notes under them not counted,
+//! and every call runs from the start, so a call with an `offset` pages
+//! through the same result. An entry below the path the call names that
+//! cannot be searched is skipped and counted, never a failure. The text
+//! of the files is returned as untrusted output.
 
 mod args;
 mod collect;

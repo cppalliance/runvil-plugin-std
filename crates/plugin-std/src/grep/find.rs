@@ -184,29 +184,39 @@ impl<S: Source> Search<'_, '_, S> {
     /// type applies, because the model named it.
     ///
     /// `size` is the file's size when the stat gave it, and `None` for a
-    /// link, whose own size says nothing about its target.
+    /// link, whose own size says nothing about its target. A size over
+    /// the limit skips the file with no read.
     async fn root_file(&mut self, root: &str, size: Option<u64>) -> Result<(), String> {
         let node = Node::file(root);
         self.considered += 1;
-        let bytes = if let Some(size) = size {
-            if size > self.limits.max_file_size {
-                self.skip(Reason::OverSize, Some(&node.shown));
-                return Ok(());
-            }
-            self.source.read(&node.access).await
-        } else {
-            self.source
-                .read_prefix(&node.access, self.limits.max_file_size.saturating_add(1))
-                .await
-        }
-        .map_err(|error| refusal(self.tool, root, &error))?;
-        if size.is_none() && length(&bytes) > self.limits.max_file_size {
+        if size.is_some_and(|size| size > self.limits.max_file_size) {
             self.skip(Reason::OverSize, Some(&node.shown));
             return Ok(());
         }
+        let read = self
+            .read(&node.access)
+            .await
+            .map_err(|error| refusal(self.tool, root, &error))?;
+        let Some(bytes) = read else {
+            self.skip(Reason::OverSize, Some(&node.shown));
+            return Ok(());
+        };
         self.bytes += length(&bytes);
         self.consume(&node.shown, &bytes);
         Ok(())
+    }
+
+    /// The bytes of the file at `path`, or `None` for a file over the
+    /// largest size a search takes. The read asks for one byte past that
+    /// size and no more, so a file that is longer than its listing or its
+    /// stat said shows as over the size and is never held whole.
+    async fn read(&self, path: &str) -> Result<Option<Vec<u8>>, FileError> {
+        let most = self.limits.max_file_size;
+        let bytes = self
+            .source
+            .read_prefix(path, most.saturating_add(1))
+            .await?;
+        Ok((length(&bytes) <= most).then_some(bytes))
     }
 
     /// Walks the directory `root`, whose `entries` are already listed,
@@ -285,11 +295,12 @@ impl<S: Source> Search<'_, '_, S> {
             self.finish(Stop::Bytes);
             return;
         }
-        match self.source.read(&node.access).await {
-            Ok(bytes) => {
+        match self.read(&node.access).await {
+            Ok(Some(bytes)) => {
                 self.bytes += length(&bytes);
                 self.consume(&node.shown, &bytes);
             }
+            Ok(None) => self.skip(Reason::OverSize, Some(&node.shown)),
             Err(error) => self.skip(file_reason(&error), Some(&node.shown)),
         }
     }

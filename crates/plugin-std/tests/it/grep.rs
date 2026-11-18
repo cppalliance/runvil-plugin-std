@@ -58,6 +58,37 @@ fn a_search_over_a_thousand_files_ends_a_step_at_each_file_operation_and_each_pa
 }
 
 #[test]
+fn a_file_that_grows_past_the_limit_after_its_listing_is_skipped_and_not_searched() {
+    let loaded = testing::load::<Std>().expect("the Plugin loads");
+    let pack = loaded
+        .new_pack(PACK)
+        .expect("the Pack instance is made")
+        .with_files(Files::new().file("/grew.txt", "x\n"));
+    let mut call = pack.start("grep", &args());
+    // The stat of the root, and then its listing, which says 2 bytes.
+    assert_eq!(call.step(), Ok(None));
+    assert_eq!(call.step(), Ok(None));
+    // Another task makes the file longer than a search takes, before the
+    // search asks for its bytes.
+    pack.files()
+        .write("/grew.txt", vec![b'x'; 16_777_218])
+        .expect("the file is written");
+    let result = loop {
+        if let Some(result) = call.step().expect("each step follows the contract") {
+            break result;
+        }
+    };
+    let output = result.expect("the search completes with its result");
+    assert_eq!(
+        output.text(),
+        "No matches found. Searched 0 files.\n\n\
+         [Skipped 1 entry: 1 file over 16777216 bytes. First: /grew.txt]\n\
+         [No ignore rules ran: .gitignore is not applied, and only entries named .git are \
+         skipped.]"
+    );
+}
+
+#[test]
 fn abandoning_a_search_after_its_first_step_leaves_the_instance_usable() {
     let loaded = testing::load::<Std>().expect("the Plugin loads");
     let pack = loaded

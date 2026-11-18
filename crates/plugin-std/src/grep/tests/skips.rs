@@ -200,6 +200,39 @@ fn a_file_over_the_size_limit_is_skipped_before_any_read() {
 }
 
 #[test]
+fn a_file_that_is_longer_than_its_listing_said_is_skipped_and_not_searched() {
+    // The listing says 10 bytes, so the file passes the check before the
+    // read, and the read then finds more bytes than the limit.
+    let mut longer = b"NEEDLE\n".to_vec();
+    longer.resize(500, b'a');
+    let source = FakeSource::default()
+        .with("/grew.log", Node::Sized(10, longer))
+        .file("/ok.txt", "NEEDLE\n");
+    let output = text_of(grep_over(
+        &source,
+        &json!({ "pattern": "NEEDLE" }),
+        &small_files(),
+    ));
+    assert_eq!(
+        output,
+        "/ok.txt\n  1:NEEDLE\n\n[Skipped 1 entry: 1 file over 100 bytes. First: /grew.log]"
+    );
+}
+
+#[test]
+fn a_file_exactly_at_the_size_limit_is_searched() {
+    let mut edge = b"NEEDLE\n".to_vec();
+    edge.resize(100, b'a');
+    let source = FakeSource::default().with("/edge.txt", Node::File(edge));
+    let output = text_of(grep_over(
+        &source,
+        &json!({ "pattern": "NEEDLE" }),
+        &small_files(),
+    ));
+    assert_eq!(output, "/edge.txt\n  1:NEEDLE");
+}
+
+#[test]
 fn a_missing_path_fails_with_the_does_not_exist_text() {
     let source = FakeSource::default().file("/a.txt", "x\n");
     let message = failure_of(grep_over(
@@ -264,6 +297,24 @@ fn a_named_file_over_the_size_limit_is_a_skip() {
         output
             .text()
             .starts_with("No matches found. Searched 0 files.\n\n[Skipped 1 entry: 1 file over 100 bytes. First: /big]"),
+        "{}",
+        output.text()
+    );
+}
+
+#[test]
+fn a_named_file_that_is_longer_than_its_stat_said_is_a_skip() {
+    let source = FakeSource::default().with("/grew", Node::Sized(10, vec![b'a'; 500]));
+    let output = grep_over(
+        &source,
+        &json!({ "pattern": "a", "path": "/grew" }),
+        &small_files(),
+    )
+    .expect("the search succeeds");
+    assert!(
+        output
+            .text()
+            .starts_with("No matches found. Searched 0 files.\n\n[Skipped 1 entry: 1 file over 100 bytes. First: /grew]"),
         "{}",
         output.text()
     );

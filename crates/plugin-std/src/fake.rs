@@ -102,6 +102,25 @@ impl FakeSource {
         FileError::new(FileErrorKind::NotFound, format!("not found: {path}"))
     }
 
+    /// Every byte of the file at `path`, as a read of the whole file
+    /// would give them.
+    fn bytes_at(&self, path: &str) -> Result<Vec<u8>, FileError> {
+        match self.nodes.get(path) {
+            Some(
+                Node::File(bytes)
+                | Node::Sized(_, bytes)
+                | Node::LinkToFile(bytes)
+                | Node::Guarded(bytes, _),
+            ) => Ok(bytes.clone()),
+            Some(Node::ReadFails(error) | Node::LinkFails(error)) => Err(error.clone()),
+            Some(Node::Link | Node::ListFails(_)) => Err(FileError::new(
+                FileErrorKind::IsADirectory,
+                format!("is a directory: {path}"),
+            )),
+            Some(Node::Pipe) | None => Err(Self::missing(path)),
+        }
+    }
+
     /// The error of a change to `path`, which the tree never takes: the
     /// error of a [`Node::Guarded`], and a fixed one for any other path.
     fn refused(&self, path: &str) -> FileError {
@@ -163,25 +182,8 @@ impl Source for FakeSource {
             .collect())
     }
 
-    async fn read(&self, path: &str) -> Result<Vec<u8>, FileError> {
-        match self.nodes.get(path) {
-            Some(
-                Node::File(bytes)
-                | Node::Sized(_, bytes)
-                | Node::LinkToFile(bytes)
-                | Node::Guarded(bytes, _),
-            ) => Ok(bytes.clone()),
-            Some(Node::ReadFails(error) | Node::LinkFails(error)) => Err(error.clone()),
-            Some(Node::Link | Node::ListFails(_)) => Err(FileError::new(
-                FileErrorKind::IsADirectory,
-                format!("is a directory: {path}"),
-            )),
-            Some(Node::Pipe) | None => Err(Self::missing(path)),
-        }
-    }
-
     async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError> {
-        let mut bytes = self.read(path).await?;
+        let mut bytes = self.bytes_at(path)?;
         bytes.truncate(usize::try_from(len).unwrap_or(usize::MAX));
         Ok(bytes)
     }
