@@ -18,9 +18,6 @@ const MAX_BYTES: u64 = 1_073_741_824;
 /// pauses.
 const SLICE_ENTRIES: usize = 32;
 
-/// How many bytes are read between two pauses: 2 MiB.
-const SLICE_BYTES: u64 = 2_097_152;
-
 /// How many skipped paths the skip line names.
 const FIRST_KEPT: usize = 5;
 
@@ -36,8 +33,6 @@ pub(super) struct Limits {
     pub(super) max_file_size: u64,
     /// The files considered and directories listed between two pauses.
     pub(super) slice_entries: usize,
-    /// The bytes read between two pauses.
-    pub(super) slice_bytes: u64,
     /// The most bytes of body in the answer.
     pub(super) body_cap: usize,
     /// How much of a long line is shown.
@@ -51,7 +46,6 @@ impl Default for Limits {
             max_bytes: MAX_BYTES,
             max_file_size: MAX_FILE_BYTES,
             slice_entries: SLICE_ENTRIES,
-            slice_bytes: SLICE_BYTES,
             body_cap: BODY_CAP,
             window: Window::default(),
         }

@@ -35,19 +35,19 @@ pub(crate) const BYTE_CAP: usize = 100_000;
 /// Returns an invalid-arguments [`ToolError`] naming the parameter for a
 /// bad argument, and a message error for any other failure, worded for a
 /// model to read.
-pub(crate) fn call(
+pub(crate) async fn call(
     source: &impl Source,
     definition: &Definition,
     args: &Value,
 ) -> Result<ToolOutput, ToolError> {
     let request = args::parse(definition, args)?;
-    read_file(source, &definition.wire_name, &request, BYTE_CAP)
+    read_file(source, &definition.wire_name, &request, BYTE_CAP).await
 }
 
 /// Reads the file `request` names, in the window it asks for, with at
 /// most `cap` bytes of numbered lines. `tool` is the name the model
 /// called the tool by.
-fn read_file(
+async fn read_file(
     source: &impl Source,
     tool: &str,
     request: &Request<'_>,
@@ -56,10 +56,11 @@ fn read_file(
     let path = request.path;
     let message = |text: String| ToolError::new(ToolErrorKind::Other, text);
     let failed = |error: FileError| message(refusal(tool, path, &error));
-    let stat = source.stat(path).map_err(failed)?;
+    let stat = source.stat(path).await.map_err(failed)?;
     check_type(path, stat.file_type).map_err(message)?;
     let bytes = source
         .read_prefix(path, MAX_FILE_BYTES + 1)
+        .await
         .map_err(failed)?;
     if u64::try_from(bytes.len()).unwrap_or(u64::MAX) > MAX_FILE_BYTES {
         return Err(message(format!(

@@ -23,19 +23,9 @@ use serde_json::Value;
 
 use super::args;
 use super::found::Limits;
+use crate::fake::block_on;
 use crate::source::Source;
 use crate::spec::{self, Definition};
-
-/// Drives a future to its output, polling again after each `Pending`.
-fn block_on<F: Future>(future: F) -> F::Output {
-    let mut future = pin!(future);
-    let mut cx = Context::from_waker(Waker::noop());
-    loop {
-        if let Poll::Ready(output) = future.as_mut().poll(&mut cx) {
-            return output;
-        }
-    }
-}
 
 /// Drives a future to its output and counts how many times it returned
 /// `Pending` on the way.

@@ -1,27 +1,19 @@
 //! Unit tests for the `std` Pack's stub text, the definitions it builds
 //! from, the arguments it parses, and the tool a call's name picks.
 
-use std::future::Future;
-use std::pin::pin;
 use std::sync::Arc;
-use std::task::{Context, Poll, Waker};
 
 use runvil_plugin_sdk::testing::Files;
 use runvil_plugin_sdk::{ToolError, ToolErrorKind, ToolOutput};
 
 use super::{INFO, NOT_IMPLEMENTED, StdPack, parse, run};
+use crate::fake::block_on;
 use crate::spec::{self, Definition};
 
 /// Runs one call of the tool `name` with `arguments` over `files` to its
-/// end, polling again after each `Pending`.
+/// end.
 fn ran(name: &str, arguments: &str, files: &Files) -> Result<ToolOutput, ToolError> {
-    let mut future = pin!(run(spec::all(), name, arguments, files));
-    let mut cx = Context::from_waker(Waker::noop());
-    loop {
-        if let Poll::Ready(result) = future.as_mut().poll(&mut cx) {
-            return result;
-        }
-    }
+    block_on(run(spec::all(), name, arguments, files))
 }
 
 #[test]

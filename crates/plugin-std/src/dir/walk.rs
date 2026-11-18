@@ -11,6 +11,7 @@ use runvil_plugin_sdk::{DirEntry, FileError, FileErrorKind, FileType};
 
 use crate::matcher::Matcher;
 use crate::order::{GIT, has_control, sorted};
+use crate::source::Source;
 
 /// One line of the tree: a name under its parent.
 #[derive(Debug)]
@@ -58,14 +59,14 @@ pub(super) struct Failure {
 struct Pending {
     /// Its index in the tree's nodes.
     node: usize,
-    /// The path the lister is given for it.
+    /// The path it is listed by.
     path: String,
     /// The depth of the entries under it: 1 for the root's.
     depth: usize,
 }
 
-/// Walks the directory `target`, breadth first, calling `list` for each
-/// directory it enters.
+/// Walks the directory `target`, breadth first, listing each directory it
+/// enters through `source`.
 ///
 /// `target` is the path as the model wrote it. `ignore` leaves out each
 /// entry whose absolute virtual path a pattern matches, and a left-out
@@ -78,23 +79,20 @@ struct Pending {
 /// is marked.
 ///
 /// # Errors
-/// Returns the lister's error, with the directory it was for, when the
-/// root cannot be listed, and for a directory below the root when the
+/// Returns the error of a listing, with the directory it was for, when
+/// the root cannot be listed, and for a directory below the root when the
 /// failure is anything but the directory being gone or no longer a
 /// directory. A claim conflict or a refusal by policy is returned rather
 /// than shown as an empty directory, because the model would read
 /// `locked/` as empty when its contents were never seen. Only a directory
 /// that is gone, or is no longer a directory, is shown with no children,
 /// because an empty look at it is true.
-pub(super) fn walk<F>(
+pub(super) async fn walk(
+    source: &impl Source,
     target: &str,
     ignore: &[Matcher],
     cap: usize,
-    mut list: F,
-) -> Result<Tree, Failure>
-where
-    F: FnMut(&str) -> Result<Vec<DirEntry>, FileError>,
-{
+) -> Result<Tree, Failure> {
     let root_line = root_line(target);
     let mut used = root_line.len() + 1;
     let mut nodes = vec![Node {
@@ -111,7 +109,7 @@ where
     let mut truncated = false;
     let mut unprintable = 0;
     while let Some(pending) = queue.pop_front() {
-        let entries = match list(&pending.path) {
+        let entries = match source.list(&pending.path).await {
             Ok(entries) => entries,
             Err(error) if pending.node != 0 && is_gone(&error) => Vec::new(),
             Err(error) => {
@@ -218,8 +216,8 @@ fn join(directory: &str, name: &str) -> String {
     }
 }
 
-/// The path the lister is given for the root: the target as written,
-/// without a trailing `/`, and `/` alone for the filesystem root.
+/// The path the root is listed by: the target as written, without a
+/// trailing `/`, and `/` alone for the filesystem root.
 fn directory_path(target: &str) -> String {
     let trimmed = target.trim_end_matches('/');
     if trimmed.is_empty() {

@@ -4,8 +4,7 @@
 use runvil_plugin_sdk::{DirEntry, FileError, FileType, Stat, ToolErrorKind};
 use serde_json::json;
 
-use super::{failure_of, list, seeded, text_of};
-use crate::dir::walk::walk;
+use super::{failure_of, list, seeded, text_of, walk_listed};
 use crate::matcher::Matcher;
 
 /// A tree with `node_modules`, `.log` files, and a `build` directory at
@@ -97,7 +96,7 @@ fn a_matching_directory_is_not_entered() {
         }
     };
     let ignore = [Matcher::new("node_modules").expect("the pattern is valid")];
-    let tree = walk("/p", &ignore, 15_000, lister).expect("the walk succeeds");
+    let tree = walk_listed("/p", &ignore, 15_000, lister).expect("the walk succeeds");
     assert_eq!(
         crate::dir::render::render(&tree),
         "/p/\n  - src/\n    - a.rs"

@@ -33,18 +33,18 @@ use self::args::Request;
 /// Returns an invalid-arguments [`ToolError`] naming the parameter for a
 /// bad argument, and a message error for any other failure, worded for a
 /// model to read.
-pub(crate) fn call(
+pub(crate) async fn call(
     source: &impl Source,
     definition: &Definition,
     args: &Value,
 ) -> Result<ToolOutput, ToolError> {
     let request = args::parse(definition, args)?;
-    list_directory(source, &definition.wire_name, &request, BODY_CAP)
+    list_directory(source, &definition.wire_name, &request, BODY_CAP).await
 }
 
 /// Lists the directory `request` names, with at most `cap` bytes of tree
 /// lines. `tool` is the name the model called the tool by.
-fn list_directory(
+async fn list_directory(
     source: &impl Source,
     tool: &str,
     request: &Request<'_>,
@@ -53,7 +53,7 @@ fn list_directory(
     let target = request.target;
     let message = |text: String| ToolError::new(ToolErrorKind::Other, text);
     let failed = |error: FileError| message(refusal(tool, target, &error));
-    let stat = match source.stat(target) {
+    let stat = match source.stat(target).await {
         Ok(stat) => stat,
         Err(error) if error.kind() == FileErrorKind::NotFound => {
             return Err(message(missing_root(target)));
@@ -61,7 +61,8 @@ fn list_directory(
         Err(error) => return Err(failed(error)),
     };
     check_directory(target, stat.file_type).map_err(message)?;
-    let tree = walk::walk(target, &request.ignore, cap, |path| source.list(path))
+    let tree = walk::walk(source, target, &request.ignore, cap)
+        .await
         .map_err(|failure| message(refusal(tool, &failure.path, &failure.error)))?;
     Ok(ToolOutput::untrusted(render::render(&tree)))
 }

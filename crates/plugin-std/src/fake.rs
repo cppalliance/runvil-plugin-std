@@ -1,17 +1,38 @@
-//! A [`Source`] the tests of every tool build by hand, for what the fake
-//! Host's tree cannot hold: a link to a directory or to a file, a pipe, a
-//! file whose listed size differs from its bytes, and a directory or a
-//! file that fails only when it is listed or read. A name may hold any
-//! character, a control character among them.
+//! What the tests of every tool share: [`FakeSource`], a [`Source`] they
+//! build by hand, and [`block_on`], which runs a tool's future to its
+//! end.
+//!
+//! The fake holds what the fake Host's tree cannot: a link to a directory
+//! or to a file, a pipe, a file whose listed size differs from its bytes,
+//! and a directory or a file that fails only when it is listed or read. A
+//! name may hold any character, a control character among them.
 //!
 //! Every node sits directly under `/`, or under a [`Node::Link`], which
 //! lists as a directory.
 
 use std::collections::BTreeMap;
+use std::future::Future;
+use std::pin::pin;
+use std::task::{Context, Poll, Waker};
 
 use runvil_plugin_sdk::{DirEntry, FileError, FileErrorKind, FileType, Stat};
 
 use crate::source::Source;
+
+/// Runs `future` to its output, polling it again after each `Pending`.
+///
+/// A tool's future waits on no waker. Over a tree held in memory each
+/// file operation answers at once, so the only `Pending` is a pause,
+/// which the next poll ends.
+pub(crate) fn block_on<F: Future>(future: F) -> F::Output {
+    let mut future = pin!(future);
+    let mut cx = Context::from_waker(Waker::noop());
+    loop {
+        if let Poll::Ready(output) = future.as_mut().poll(&mut cx) {
+            return output;
+        }
+    }
+}
 
 /// One node of the fake tree.
 #[derive(Debug, Clone)]
@@ -84,8 +105,12 @@ fn split(path: &str) -> (&str, &str) {
     }
 }
 
+#[expect(
+    clippy::unused_async_trait_impl,
+    reason = "the methods are async for a Host that answers in a later step, and a tree held in memory answers at once"
+)]
 impl Source for FakeSource {
-    fn stat(&self, path: &str) -> Result<Stat, FileError> {
+    async fn stat(&self, path: &str) -> Result<Stat, FileError> {
         if path == "/" {
             return Ok(Stat::new(FileType::Directory, 0));
         }
@@ -95,7 +120,7 @@ impl Source for FakeSource {
             .ok_or_else(|| Self::missing(path))
     }
 
-    fn list(&self, path: &str) -> Result<Vec<DirEntry>, FileError> {
+    async fn list(&self, path: &str) -> Result<Vec<DirEntry>, FileError> {
         if path != "/" {
             match self.nodes.get(path) {
                 None => return Err(Self::missing(path)),
@@ -119,7 +144,7 @@ impl Source for FakeSource {
             .collect())
     }
 
-    fn read(&self, path: &str) -> Result<Vec<u8>, FileError> {
+    async fn read(&self, path: &str) -> Result<Vec<u8>, FileError> {
         match self.nodes.get(path) {
             Some(Node::File(bytes) | Node::Sized(_, bytes) | Node::LinkToFile(bytes)) => {
                 Ok(bytes.clone())
@@ -133,8 +158,8 @@ impl Source for FakeSource {
         }
     }
 
-    fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError> {
-        let mut bytes = self.read(path)?;
+    async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError> {
+        let mut bytes = self.read(path).await?;
         bytes.truncate(usize::try_from(len).unwrap_or(usize::MAX));
         Ok(bytes)
     }

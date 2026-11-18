@@ -5,10 +5,10 @@ use runvil_plugin_sdk::testing::Files;
 use runvil_plugin_sdk::{DirEntry, FileError, FileErrorKind, FileType, Stat};
 use serde_json::json;
 
-use super::{failure_of, list, seeded, text_of};
+use super::{failure_of, list, seeded, text_of, walk_listed};
 use crate::dir::check_directory;
 use crate::dir::render::render;
-use crate::dir::walk::{Failure, walk};
+use crate::dir::walk::Failure;
 use crate::fake::{FakeSource, Node};
 use crate::matcher::Matcher;
 use crate::refusal::refusal;
@@ -273,7 +273,7 @@ fn a_symlink_is_listed_by_name_without_a_slash_and_is_never_entered() {
             other => panic!("the walk entered {other}"),
         }
     };
-    let tree = walk("/p", &[], 15_000, lister).expect("the walk succeeds");
+    let tree = walk_listed("/p", &[], 15_000, lister).expect("the walk succeeds");
     assert_eq!(
         render(&tree),
         "/p/\n  - file\n  - link\n  - sub/\n    - inner"
@@ -288,7 +288,7 @@ fn every_other_kind_of_node_is_listed_as_a_plain_name() {
             entry("sock", FileType::Other),
         ])
     };
-    let tree = walk("/dev", &[], 15_000, lister).expect("the walk succeeds");
+    let tree = walk_listed("/dev", &[], 15_000, lister).expect("the walk succeeds");
     assert_eq!(render(&tree), "/dev/\n  - fifo\n  - sock");
 }
 
@@ -306,7 +306,7 @@ fn the_pack_sorts_each_listing_itself_because_list_promises_no_order() {
             other => panic!("the walk entered {other}"),
         }
     };
-    let tree = walk("/p", &[], 15_000, lister).expect("the walk succeeds");
+    let tree = walk_listed("/p", &[], 15_000, lister).expect("the walk succeeds");
     assert_eq!(
         render(&tree),
         "/p/\n  - B\n  - a-b\n  - a/\n    - Z\n    - z\n  - b"
@@ -321,7 +321,8 @@ fn a_failure_listing_the_root_is_returned_for_the_tool_to_word() {
             format!("not a directory: {path}"),
         ))
     };
-    let failure = walk("/link/", &[], 15_000, lister).expect_err("the root cannot be listed");
+    let failure =
+        walk_listed("/link/", &[], 15_000, lister).expect_err("the root cannot be listed");
     assert_eq!(
         failure,
         Failure {
@@ -350,7 +351,7 @@ fn a_subdirectory_that_is_gone_or_no_longer_a_directory_is_shown_without_childre
             other => panic!("the walk entered {other}"),
         }
     };
-    let tree = walk("/p", &[], 15_000, lister).expect("an empty look at these is true");
+    let tree = walk_listed("/p", &[], 15_000, lister).expect("an empty look at these is true");
     assert_eq!(
         render(&tree),
         "/p/\n  - gone/\n  - open/\n    - a\n  - swapped/"
@@ -371,7 +372,7 @@ fn a_subdirectory_that_cannot_be_listed_for_any_other_reason_fails_the_walk() {
                 other => panic!("the walk entered {other}"),
             }
         };
-        let failure = walk("/p", &[], 15_000, lister).expect_err(label);
+        let failure = walk_listed("/p", &[], 15_000, lister).expect_err(label);
         assert_eq!(
             failure.path, "/p/locked",
             "{label}: the directory that failed"
@@ -405,7 +406,8 @@ fn a_conflict_below_the_root_is_worded_for_the_directory_that_conflicted() {
             other => panic!("the walk entered {other}"),
         }
     };
-    let failure = walk("notes", &[], 15_000, lister).expect_err("the conflict fails the walk");
+    let failure =
+        walk_listed("notes", &[], 15_000, lister).expect_err("the conflict fails the walk");
     assert_eq!(
         refusal("ListDir", &failure.path, &failure.error),
         "notes/locked was changed, or is being changed, by another call in this round, so it \
@@ -496,7 +498,7 @@ fn a_directory_with_a_control_character_in_its_name_is_never_entered() {
             other => panic!("the walk entered {other:?}"),
         }
     };
-    let tree = walk("/p", &[], 15_000, lister).expect("the walk succeeds");
+    let tree = walk_listed("/p", &[], 15_000, lister).expect("the walk succeeds");
     assert_eq!(tree.unprintable, 2, "one at each level");
     assert_eq!(
         render(&tree),
@@ -514,7 +516,7 @@ fn an_ignored_entry_and_dot_git_are_not_counted_whatever_their_names() {
         ])
     };
     let ignore = [Matcher::new("*.log").expect("the pattern is valid")];
-    let tree = walk("/p", &ignore, 15_000, lister).expect("the walk succeeds");
+    let tree = walk_listed("/p", &ignore, 15_000, lister).expect("the walk succeeds");
     assert_eq!(tree.unprintable, 0);
     assert_eq!(render(&tree), "/p/\n  - kept");
 }
@@ -529,7 +531,7 @@ fn the_note_for_names_follows_the_note_of_a_cut_listing() {
         ])
     };
     // The root line and the line of `a` fit, and the line of `b` does not.
-    let tree = walk("/p", &[], 10, lister).expect("the walk succeeds");
+    let tree = walk_listed("/p", &[], 10, lister).expect("the walk succeeds");
     assert!(tree.truncated);
     let text = render(&tree);
     assert!(

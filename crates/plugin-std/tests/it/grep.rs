@@ -1,6 +1,6 @@
-//! Grep's steps, seen from the Host's side of the contract: a search over
-//! many files ends its step before it completes, so the Host can abandon
-//! it, and an abandoned search leaves the Pack instance usable.
+//! Grep's steps, seen from the Host's side of the contract: a search ends
+//! its step at each file operation and at each pause, so the Host can
+//! abandon it, and an abandoned search leaves the Pack instance usable.
 
 use plugin_std::Std;
 use runvil_plugin_sdk::testing::{self, Files};
@@ -25,7 +25,7 @@ fn args() -> String {
 }
 
 #[test]
-fn a_search_over_a_thousand_files_takes_many_steps_before_it_completes() {
+fn a_search_over_a_thousand_files_ends_a_step_at_each_file_operation_and_each_pause() {
     let loaded = testing::load::<Std>().expect("the Plugin loads");
     let pack = loaded
         .new_pack(PACK)
@@ -39,9 +39,11 @@ fn a_search_over_a_thousand_files_takes_many_steps_before_it_completes() {
             None => pending += 1,
         }
     };
-    assert!(
-        pending >= 31,
-        "a step ends after each 32 of {FILES} files, and the search took {pending} extra steps"
+    assert_eq!(
+        pending,
+        2 + FILES + FILES / 32,
+        "a step ends at the stat of the root, at its listing, at the read of each file, and \
+         at the pause after each 32 files"
     );
     let output = result.expect("the search completes with its result");
     assert!(!output.is_trusted());

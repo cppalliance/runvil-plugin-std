@@ -63,9 +63,8 @@
 //! not counted, a call with an `offset` pages through the same result,
 //! and a binary file, a link, an over-size file, and an entry that cannot
 //! be read are skipped and counted, never a failure. A search ends its
-//! step every 32 files or directories, or every 2 MiB read, so a cancel
-//! or a stop can drop it between two steps. File text comes back as
-//! untrusted output.
+//! step every 32 files or directories, so a cancel or a stop can drop it
+//! between two steps. File text comes back as untrusted output.
 //!
 //! Write, StrReplace, Delete, and Glob are still stubs: a call with
 //! arguments that match the schema answers [`NOT_IMPLEMENTED`]. For every
@@ -77,12 +76,13 @@
 //!
 //! Every filesystem operation a tool performs goes through its
 //! [`ToolCall`](runvil_plugin_sdk::ToolCall), never the disk directly.
-//! The Host answers each one under the run's policy, so a read the policy
-//! denies fails without the Pack deciding anything. A tool reports the
-//! [`FileError`](runvil_plugin_sdk::FileError) for the path its call
-//! names as a tool error the model can read. Below that path, ListDir
-//! fails the same way on a directory that is there and cannot be listed,
-//! and Grep skips the entry and counts it.
+//! Each one ends the step of its call: the Host performs the operation
+//! under the run's policy, and a later step goes on with the answer. So
+//! a read the policy denies fails without the Pack deciding anything. A
+//! tool reports the [`FileError`](runvil_plugin_sdk::FileError) for the
+//! path its call names as a tool error the model can read. Below that
+//! path, ListDir fails the same way on a directory that is there and
+//! cannot be listed, and Grep skips the entry and counts it.
 //!
 //! Shell is deliberately absent. An in-process shell over the same
 //! filesystem is a separate Pack, so a run that wants one declares it.

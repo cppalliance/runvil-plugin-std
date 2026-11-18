@@ -3,9 +3,8 @@
 //!
 //! [`find`] is a pure function of its [`Source`]: it reads no clock, keeps
 //! nothing between calls, and returns what it found without writing any
-//! text. It ends its step after every slice of entries or bytes its
-//! [`Limits`] name, so the Host can abandon a running search between two
-//! steps.
+//! text. It ends its step after every slice of entries its [`Limits`]
+//! name, so the Host can abandon a running search between two steps.
 
 use runvil_plugin_sdk::{DirEntry, FileError, FileErrorKind, FileType, next_step};
 
@@ -99,7 +98,7 @@ pub(super) async fn find<S: Source>(
     limits: &Limits,
 ) -> Result<Found, String> {
     let root = request.path.unwrap_or("/");
-    let stat = match source.stat(root) {
+    let stat = match source.stat(root).await {
         Ok(stat) => stat,
         Err(error) if error.kind() == FileErrorKind::NotFound => return Err(missing_root(root)),
         Err(error) => return Err(refusal(tool, root, &error)),
@@ -114,12 +113,11 @@ pub(super) async fn find<S: Source>(
         considered: 0,
         bytes: 0,
         since_entries: 0,
-        since_bytes: 0,
         finished: false,
     };
     match stat.file_type {
         FileType::Directory => search.directory(root).await?,
-        FileType::File => search.root_file(root, Some(stat.len))?,
+        FileType::File => search.root_file(root, Some(stat.len)).await?,
         FileType::Symlink => search.link(root).await?,
         _ => return Err(neither_file_nor_directory(root)),
     }
@@ -149,8 +147,6 @@ pub(super) struct Search<'a, 'r, S: Source> {
     /// The files considered and the directories listed since the last
     /// pause.
     since_entries: usize,
-    /// The bytes read since the last pause.
-    since_bytes: u64,
     /// Whether the search has everything it needs, or hit a limit.
     pub(super) finished: bool,
 }
@@ -162,6 +158,7 @@ impl<S: Source> Search<'_, '_, S> {
         let entries = self
             .source
             .list(&node.access)
+            .await
             .map_err(|error| refusal(self.tool, root, &error))?;
         self.walk(node, entries).await;
         Ok(())
@@ -171,13 +168,13 @@ impl<S: Source> Search<'_, '_, S> {
     /// and as a file when it does not.
     async fn link(&mut self, root: &str) -> Result<(), String> {
         let node = Node::directory(root);
-        match self.source.list(&node.access) {
+        match self.source.list(&node.access).await {
             Ok(entries) => {
                 self.walk(node, entries).await;
                 Ok(())
             }
             Err(error) if error.kind() == FileErrorKind::NotADirectory => {
-                self.root_file(root, None)
+                self.root_file(root, None).await
             }
             Err(error) => Err(refusal(self.tool, root, &error)),
         }
@@ -188,7 +185,7 @@ impl<S: Source> Search<'_, '_, S> {
     ///
     /// `size` is the file's size when the stat gave it, and `None` for a
     /// link, whose own size says nothing about its target.
-    fn root_file(&mut self, root: &str, size: Option<u64>) -> Result<(), String> {
+    async fn root_file(&mut self, root: &str, size: Option<u64>) -> Result<(), String> {
         let node = Node::file(root);
         self.considered += 1;
         let bytes = if let Some(size) = size {
@@ -196,10 +193,11 @@ impl<S: Source> Search<'_, '_, S> {
                 self.skip(Reason::OverSize, Some(&node.shown));
                 return Ok(());
             }
-            self.source.read(&node.access)
+            self.source.read(&node.access).await
         } else {
             self.source
                 .read_prefix(&node.access, self.limits.max_file_size.saturating_add(1))
+                .await
         }
         .map_err(|error| refusal(self.tool, root, &error))?;
         if size.is_none() && length(&bytes) > self.limits.max_file_size {
@@ -237,7 +235,7 @@ impl<S: Source> Search<'_, '_, S> {
             match entry.stat.file_type {
                 FileType::Symlink => self.skip(Reason::SymbolicLink, Some(&child.shown)),
                 FileType::Directory => {
-                    match self.source.list(&child.access) {
+                    match self.source.list(&child.access).await {
                         Ok(entries) => stack.push(Frame {
                             dir: child,
                             entries: sorted(entries).into_iter(),
@@ -250,7 +248,7 @@ impl<S: Source> Search<'_, '_, S> {
                     self.pace().await;
                 }
                 FileType::File => {
-                    self.visit(&child, &entry.name, entry.stat.len);
+                    self.visit(&child, &entry.name, entry.stat.len).await;
                     self.pace().await;
                 }
                 // A pipe, a socket, or a device is never opened: reading one
@@ -262,7 +260,7 @@ impl<S: Source> Search<'_, '_, S> {
 
     /// Visits one file the walk met: counts it, applies the filters,
     /// reads it, and searches it.
-    fn visit(&mut self, node: &Node, name: &str, size: u64) {
+    async fn visit(&mut self, node: &Node, name: &str, size: u64) {
         if self.considered >= self.limits.max_files {
             self.finish(Stop::Files);
             return;
@@ -287,25 +285,23 @@ impl<S: Source> Search<'_, '_, S> {
             self.finish(Stop::Bytes);
             return;
         }
-        match self.source.read(&node.access) {
+        match self.source.read(&node.access).await {
             Ok(bytes) => {
                 self.bytes += length(&bytes);
-                self.since_bytes += length(&bytes);
                 self.consume(&node.shown, &bytes);
             }
             Err(error) => self.skip(file_reason(&error), Some(&node.shown)),
         }
     }
 
-    /// Pauses when enough entries or bytes have gone by since the last
-    /// pause: ends the step, so that no step works for long and a cancel
-    /// or a stop can drop the future between two steps.
+    /// Pauses when enough entries have gone by since the last pause: ends
+    /// the step, so that no step works for long and a cancel or a stop
+    /// can drop the future between two steps. A listing or a read through
+    /// the Host ends the step too, so the pause is what bounds a run of
+    /// files that a filter leaves unread.
     async fn pace(&mut self) {
-        if self.since_entries >= self.limits.slice_entries
-            || self.since_bytes >= self.limits.slice_bytes
-        {
+        if self.since_entries >= self.limits.slice_entries {
             self.since_entries = 0;
-            self.since_bytes = 0;
             next_step().await;
         }
     }

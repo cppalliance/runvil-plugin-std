@@ -13,6 +13,7 @@ use runvil_plugin_sdk::{ToolError, ToolOutput};
 use serde_json::Value;
 
 use super::args::Request;
+use crate::fake::block_on;
 use crate::source::Source;
 use crate::spec::{self, Definition};
 
@@ -34,7 +35,7 @@ fn definition() -> &'static Definition {
 fn read(files: &impl Source, args: &Value) -> Result<ToolOutput, ToolError> {
     let definition = definition();
     crate::check::check(&definition.wire_name, &definition.parameters, args)?;
-    super::call(files, definition, args)
+    block_on(super::call(files, definition, args))
 }
 
 /// Reads `path` with the window `offset` and `limit` under the byte cap
@@ -51,7 +52,7 @@ fn read_capped(
         offset,
         limit,
     };
-    super::read_file(files, "Read", &request, cap)
+    block_on(super::read_file(files, "Read", &request, cap))
 }
 
 /// The text of a successful read, which must be untrusted output.

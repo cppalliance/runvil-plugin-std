@@ -17,7 +17,7 @@ The Plugin inserts one Pack, `runvil/std`, which gives a run the standard file t
 - Each tool's wire name, description, and parameter schema is a JSON file under `crates/plugin-std/schemas`, and `EDITS.md` beside them lists how each differs from Cursor's definition.
 - Every file a tool reads goes through the Host, so the run's policy applies to each read. A read the policy denies fails the call with the policy's own reason. The one exception is an entry below the path a Grep call names, which Grep skips and counts.
 - File text and file names come back as untrusted output. The Host marks them before a model reads them.
-- A search ends its step every 32 files or directories, or every 2 MiB read, so the Host can cancel it between two steps.
+- A tool call ends its step at each file operation, and the Host performs the operation before the next step. A search also ends its step every 32 files or directories, so the Host can cancel a call between two steps.
 
 ## Building
 

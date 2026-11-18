@@ -95,8 +95,8 @@ async fn run(
     let args = parse(&definition.wire_name, arguments)?;
     crate::check::check(&definition.wire_name, &definition.parameters, &args)?;
     match definition.segment {
-        "read" => crate::read::call(source, definition, &args),
-        "dir" => crate::dir::call(source, definition, &args),
+        "read" => crate::read::call(source, definition, &args).await,
+        "dir" => crate::dir::call(source, definition, &args).await,
         "grep" => crate::grep::call(source, definition, &args).await,
         _ => Ok(ToolOutput::trusted(stub(&definition.wire_name))),
     }

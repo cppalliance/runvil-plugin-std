@@ -370,21 +370,27 @@ fn a_tree_of_directories_with_no_files_still_pauses_once_per_slice() {
 }
 
 #[test]
-fn the_search_pauses_once_per_slice_of_bytes() {
+fn a_run_of_files_that_a_filter_leaves_unread_still_pauses_once_per_slice() {
     let mut source = FakeSource::default();
     for index in 0..10 {
-        source = source.file(&format!("/f{index}"), "0123456789");
+        source = source.file(&format!("/f{index}.log"), "x\n");
     }
     let limits = Limits {
-        slice_bytes: 25,
+        slice_entries: 3,
         ..Limits::default()
     };
     let definition = definition();
-    let args = json!({ "pattern": "x" });
+    let args = json!({ "pattern": "x", "glob": "*.txt" });
     let request = args::parse(definition, &args).expect("the arguments parse");
     let (output, pending) = count_pendings(crate::grep::search(&source, "Grep", &request, &limits));
-    assert!(output.is_ok());
-    assert_eq!(pending, 3, "after files 3, 6, and 9, at 30 bytes each time");
+    assert!(
+        output
+            .expect("the search succeeds")
+            .text()
+            .starts_with("No matches found. Searched 0 files."),
+        "no file passes the glob, so none is read"
+    );
+    assert_eq!(pending, 3, "after files 3, 6, and 9");
 }
 
 #[test]
