@@ -220,6 +220,24 @@ fn a_file_that_is_longer_than_its_listing_said_is_skipped_and_not_searched() {
 }
 
 #[test]
+fn each_read_asks_for_one_byte_past_the_size_limit_and_no_more() {
+    let source = FakeSource::default()
+        .with("/grew.log", Node::Sized(10, vec![b'a'; 500]))
+        .file("/ok.txt", "NEEDLE\n");
+    // A walk reads both files, and the call after it reads the one file
+    // that it names, under the limit of 16 MiB that a real search has.
+    let walked = grep_over(&source, &json!({ "pattern": "NEEDLE" }), &small_files());
+    assert!(walked.is_ok());
+    let named = grep_over(
+        &source,
+        &json!({ "pattern": "NEEDLE", "path": "/ok.txt" }),
+        &Limits::default(),
+    );
+    assert!(named.is_ok());
+    assert_eq!(source.asked(), [101, 101, 16_777_217]);
+}
+
+#[test]
 fn a_read_that_turns_out_over_the_size_limit_counts_toward_the_byte_limit() {
     // Each listing says 10 bytes, and each read brings 101, one more than
     // the size limit. The second read brings the count to the byte limit,

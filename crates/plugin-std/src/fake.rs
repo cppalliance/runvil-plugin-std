@@ -12,6 +12,7 @@
 //! lists as a directory. The tree never changes: it fails every change,
 //! with the error of a [`Node::Guarded`] where the path names one.
 
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::pin;
@@ -67,9 +68,17 @@ pub(crate) enum Node {
 pub(crate) struct FakeSource {
     /// Every node but the root.
     nodes: BTreeMap<String, Node>,
+    /// The most bytes that each read asked for, in the order of the reads.
+    asked: RefCell<Vec<u64>>,
 }
 
 impl FakeSource {
+    /// The most bytes that each read of the tree asked for, in the order
+    /// of the reads.
+    pub(crate) fn asked(&self) -> Vec<u64> {
+        self.asked.borrow().clone()
+    }
+
     /// The tree with `node` added at `path`.
     pub(crate) fn with(mut self, path: &str, node: Node) -> FakeSource {
         self.nodes.insert(path.to_owned(), node);
@@ -183,6 +192,7 @@ impl Source for FakeSource {
     }
 
     async fn read_prefix(&self, path: &str, len: u64) -> Result<Vec<u8>, FileError> {
+        self.asked.borrow_mut().push(len);
         let mut bytes = self.bytes_at(path)?;
         bytes.truncate(usize::try_from(len).unwrap_or(usize::MAX));
         Ok(bytes)
