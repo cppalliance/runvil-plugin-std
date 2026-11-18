@@ -1,6 +1,7 @@
 //! The tools that change files, through the Plugin's entry point: which
 //! tools say to the Host that they change files, what a call leaves in
-//! the files of its run, what it answers, and how many requests it makes.
+//! the files of its run, what it answers, and what it asks the Host for,
+//! step by step.
 
 use plugin_std::Std;
 use runvil_plugin_sdk::testing::{self, Files};
@@ -88,8 +89,19 @@ fn write_replaces_the_whole_contents_of_a_file() {
 
 #[test]
 fn write_asks_the_host_for_one_write_and_nothing_else() {
+    let loaded = testing::load::<Std>().expect("the Plugin loads");
+    let pack = loaded.new_pack(PACK).expect("the Pack instance is made");
     let args = json!({ "path": "/a.md", "contents": "x" });
-    assert_eq!(steps(Files::new(), "write", &args), 2);
+    let mut call = pack.start("write", &args.to_string());
+    // The first step ends at a request, which the Host has performed
+    // when the step returns: it is the write.
+    assert_eq!(call.step(), Ok(None));
+    assert_eq!(contents(pack.files(), "/a.md"), Ok(b"x".to_vec()));
+    // The second step has the answer and ends the call.
+    assert_eq!(
+        call.step(),
+        Ok(Some(Ok(ToolOutput::trusted("Wrote 1 byte."))))
+    );
 }
 
 #[test]
@@ -183,9 +195,32 @@ fn str_replace_with_replace_all_edits_every_occurrence() {
 
 #[test]
 fn str_replace_asks_the_host_for_a_stat_a_read_and_a_write() {
-    let files = Files::new().file("/a.md", "one two\n");
+    let loaded = testing::load::<Std>().expect("the Plugin loads");
+    let pack = loaded
+        .new_pack(PACK)
+        .expect("the Pack instance is made")
+        .with_files(Files::new().file("/a.md", "one two\n"));
     let args = json!({ "path": "/a.md", "old_string": "two", "new_string": "2" });
-    assert_eq!(steps(files, "replace", &args), 4);
+    let mut call = pack.start("replace", &args.to_string());
+    // The first request changes nothing, and it reads none of the bytes
+    // that the edit works on: the test puts other bytes in the file once
+    // the Host has performed it, and the edit is made on those.
+    assert_eq!(call.step(), Ok(None));
+    assert_eq!(contents(pack.files(), "/a.md"), Ok(b"one two\n".to_vec()));
+    pack.files()
+        .write("/a.md", "uno two\n")
+        .expect("the file is written");
+    // The second request is the read, which changes nothing.
+    assert_eq!(call.step(), Ok(None));
+    assert_eq!(contents(pack.files(), "/a.md"), Ok(b"uno two\n".to_vec()));
+    // The third request is the write of the edited text.
+    assert_eq!(call.step(), Ok(None));
+    assert_eq!(contents(pack.files(), "/a.md"), Ok(b"uno 2\n".to_vec()));
+    // The fourth step has the answer and ends the call.
+    assert_eq!(
+        call.step(),
+        Ok(Some(Ok(ToolOutput::trusted("Made 1 replacement."))))
+    );
 }
 
 #[test]
@@ -254,8 +289,23 @@ fn delete_removes_a_file_and_answers_fixed_text_as_trusted_output() {
 
 #[test]
 fn delete_asks_the_host_for_a_stat_and_then_a_removal() {
-    let files = Files::new().file("/a.md", "one");
-    assert_eq!(steps(files, "rm", &json!({ "path": "/a.md" })), 3);
+    let loaded = testing::load::<Std>().expect("the Plugin loads");
+    let pack = loaded
+        .new_pack(PACK)
+        .expect("the Pack instance is made")
+        .with_files(Files::new().file("/a.md", "one"));
+    let mut call = pack.start("rm", &json!({ "path": "/a.md" }).to_string());
+    // The first request is the stat, which removes nothing.
+    assert_eq!(call.step(), Ok(None));
+    assert_eq!(contents(pack.files(), "/a.md"), Ok(b"one".to_vec()));
+    // The second request is the removal.
+    assert_eq!(call.step(), Ok(None));
+    assert_eq!(pack.files(), &Files::new());
+    // The third step has the answer and ends the call.
+    assert_eq!(
+        call.step(),
+        Ok(Some(Ok(ToolOutput::trusted("Deleted the file."))))
+    );
 }
 
 #[test]

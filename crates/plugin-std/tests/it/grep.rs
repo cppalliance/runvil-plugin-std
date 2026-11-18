@@ -88,20 +88,30 @@ fn a_file_that_grows_past_the_limit_after_its_listing_is_skipped_and_not_searche
     );
 }
 
+/// How many steps a search of the seeded tree takes up to its first
+/// pause: the stat of the root, its listing, the reads of 32 files, and
+/// the step that ends at the pause.
+const FIRST_PAUSE: usize = 2 + 32 + 1;
+
 #[test]
-fn abandoning_a_search_after_its_first_step_leaves_the_instance_usable() {
+fn abandoning_a_search_at_a_request_or_at_its_first_pause_leaves_the_instance_usable() {
     let loaded = testing::load::<Std>().expect("the Plugin loads");
     let pack = loaded
         .new_pack(PACK)
         .expect("the Pack instance is made")
         .with_files(seeded());
-    {
+    // The search is abandoned at the stat of the root, then at the read
+    // of a file with some files searched, and then at its first pause,
+    // with 32 files searched and no request with the Host.
+    for steps in [1, 10, FIRST_PAUSE] {
         let mut abandoned = pack.start("grep", &args());
-        assert_eq!(
-            abandoned.step(),
-            Ok(None),
-            "the search ends its first step before it can finish"
-        );
+        for step in 1..=steps {
+            assert_eq!(
+                abandoned.step(),
+                Ok(None),
+                "step {step} of {steps} ends before the search can finish"
+            );
+        }
         // Dropping the call sends `RV_TOOL_CANCEL`, as a canceled run does.
     }
     let read = pack
