@@ -24,9 +24,10 @@ use crate::source::Source;
 
 /// Runs `future` to its output, polling it again after each `Pending`.
 ///
-/// A tool's future waits on no waker. Over a tree held in memory each
-/// file operation answers at once, so the only `Pending` is a pause,
-/// which the next poll ends.
+/// It waits for no wake between two polls. Over a tree held in memory
+/// each file operation answers at once, so the only `Pending` is a
+/// pause, which wakes its task as it returns: the next poll is due
+/// right away, and that poll ends the pause.
 pub(crate) fn block_on<F: Future>(future: F) -> F::Output {
     let mut future = pin!(future);
     let mut cx = Context::from_waker(Waker::noop());
